@@ -11,7 +11,11 @@ app.use(express.urlencoded({ extended: true }));
 
 // Cors setup
 const corsOptions = {
-  origin: "http://localhost:3000",
+  origin: [
+    "http://taskwatcher.runasp.net",
+    "https://taskwatcher.runasp.net",
+    "http://localhost:3000",
+  ],
   credentials: true,
   optionsSuccessStatus: 200,
 };
