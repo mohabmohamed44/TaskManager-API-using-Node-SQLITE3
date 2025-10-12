@@ -21,6 +21,10 @@ class TaskController {
 
   async createTask(req, res, next) {
     try {
+      console.log("Controller createTask called with:", {
+        body: req.body,
+        headers: req.headers["content-type"],
+      });
       const task = await taskService.createTask(req.body);
       res.status(201).json(task);
     } catch (error) {
@@ -30,6 +34,11 @@ class TaskController {
 
   async updateTask(req, res, next) {
     try {
+      console.log("Controller updateTask called with:", {
+        params: req.params,
+        body: req.body,
+        headers: req.headers["content-type"],
+      });
       const task = await taskService.updateTask(req.params.id, req.body);
       res.json(task);
     } catch (error) {
