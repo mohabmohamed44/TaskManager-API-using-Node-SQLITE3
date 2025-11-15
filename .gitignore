@@ -1,6 +1,14 @@
 # Dependencies
 node_modules/
 
+# markdown files
+*.md
+*.markdown
+*.txt
+
+# test files
+test-auth.test.js
+
 # Environment variables
 .env
 .env.local
@@ -17,7 +25,7 @@ yarn-error.log*
 lerna-debug.log*
 
 # database files
-tasks.db
+*.db
 
 # Runtime data
 pids
@@ -28,6 +36,9 @@ pids
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov
+
+# Attachment Files
+uploads/
 
 # nyc test coverage
 .nyc_output
@@ -112,3 +123,11 @@ temp/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Markdown files
+*.md
+*.txt
+
+# Database files
+*.db
+database.sqlite
