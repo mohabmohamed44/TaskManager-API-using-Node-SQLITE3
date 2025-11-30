@@ -12,12 +12,21 @@ class HistoryRepository {
       newValue = null,
     } = history;
 
+    // --- Start Validation ---
+    const tid = Number(taskId);
+    const uid = Number(userId);
+
+    if (!Number.isInteger(tid) || !Number.isInteger(uid)) {
+      throw { status: 400, message: "Invalid taskId or userId for history log" };
+    }
+    // --- End Validation ---
+
     const { data, error } = await supabase
       .from("task_history")
       .insert([
         {
-          task_id: taskId,
-          user_id: userId,
+          task_id: tid, // Use validated id
+          user_id: uid, // Use validated id
           action,
           field,
           old_value: oldValue,
@@ -27,7 +36,12 @@ class HistoryRepository {
       .select()
       .single();
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (error.code === "22P02") {
+        throw { status: 400, message: "Invalid numeric value provided for history log." };
+      }
+      throw error;
+    }
     return data.id; // return inserted ID
   }
 

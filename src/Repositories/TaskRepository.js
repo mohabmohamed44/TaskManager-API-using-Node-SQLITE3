@@ -23,13 +23,17 @@ class TaskRepository {
   }
 
   async getById(id, userId) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("tasks")
       .select("*")
       .eq("id", id)
-      .eq("user_id", userId)
-      .eq("is_deleted", false)
-      .single();
+      .eq("is_deleted", false);
+
+    if (userId !== undefined && userId !== null) {
+      query = query.eq("user_id", userId);
+    }
+
+    const { data, error } = await query.single();
 
     if (error && error.code !== "PGRST116") throw error;
     return data;
