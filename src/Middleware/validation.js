@@ -10,7 +10,7 @@ const validate = (req, res, next) => {
 
 const taskValidation = {
   create: [
-    body("title").trim().notEmpty().withMessage("Title is required"),
+    body("title").notEmpty().withMessage("Title is required").trim(),
     body("description").optional().trim(),
     body("priority").optional().isIn(["low", "medium", "high", "urgent"]),
     body("category").optional().trim(),

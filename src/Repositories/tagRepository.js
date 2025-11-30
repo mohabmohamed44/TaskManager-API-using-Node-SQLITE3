@@ -1,24 +1,11 @@
-const database = require("../config/database");
+const supabase  = require("../config/database");
 
 class TagRepository {
   constructor() {
-    // Color palette for tags
     this.colorPalette = [
-      "#EF4444", // Red
-      "#F59E0B", // Amber
-      "#10B981", // Green
-      "#3B82F6", // Blue
-      "#8B5CF6", // Violet
-      "#EC4899", // Pink
-      "#06B6D4", // Cyan
-      "#F97316", // Orange
-      "#84CC16", // Lime
-      "#6366F1", // Indigo
-      "#14B8A6", // Teal
-      "#F43F5E", // Rose
-      "#A855F7", // Purple
-      "#22D3EE", // Sky
-      "#FB923C", // Orange-400
+      "#EF4444", "#F59E0B", "#10B981", "#3B82F6", "#8B5CF6",
+      "#EC4899", "#06B6D4", "#F97316", "#84CC16", "#6366F1",
+      "#14B8A6", "#F43F5E", "#A855F7", "#22D3EE", "#FB923C"
     ];
     this.currentColorIndex = 0;
   }
@@ -30,56 +17,97 @@ class TagRepository {
     return color;
   }
 
+  // Create a new tag
   async create(tag) {
     const { name, color } = tag;
-    // Assign a unique color from the palette if not provided
     const tagColor = color || this.getNextColor();
-    const result = await database.run(
-      "INSERT INTO tags (name, color) VALUES (?, ?)",
-      [name, tagColor],
-    );
-    return this.getById(result.lastID);
+
+    const { data, error } = await supabase
+      .from("tags")
+      .upsert([{ name, color: tagColor }], { onConflict: "name" })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return data;
   }
 
   async getById(id) {
-    return await database.get("SELECT * FROM tags WHERE id = ?", [id]);
+    const { data, error } = await supabase
+      .from("tags")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) throw new Error(error.message);
+    return data;
   }
 
   async getByName(name) {
-    return await database.get("SELECT * FROM tags WHERE name = ?", [name]);
+    const { data, error } = await supabase
+      .from("tags")
+      .select("*")
+      .eq("name", name)
+      .single();
+
+    if (error) return null; // tag not found
+    return data;
   }
 
   async getAll() {
-    return await database.all("SELECT * FROM tags ORDER BY name ASC");
+    const { data, error } = await supabase
+      .from("tags")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    return data;
   }
 
+  // Add tag to task
   async addTagToTask(taskId, tagId) {
-    await database.run(
-      "INSERT OR IGNORE INTO task_tags (taskId, tagId) VALUES (?, ?)",
-      [taskId, tagId],
-    );
+    const { error } = await supabase
+      .from("task_tags")
+      .upsert([{ task_id: taskId, tag_id: tagId }], { onConflict: "task_id,tag_id" }); // avoid duplicates
+
+    if (error) throw new Error(error.message);
   }
 
+  // Remove tag from task
   async removeTagFromTask(taskId, tagId) {
-    const result = await database.run(
-      "DELETE FROM task_tags WHERE taskId = ? AND tagId = ?",
-      [taskId, tagId],
-    );
-    return result.changes > 0;
+    const { data, error } = await supabase
+      .from("task_tags")
+      .delete()
+      .eq("task_id", taskId)
+      .eq("tag_id", tagId);
+
+    if (error) throw new Error(error.message);
+    return data.length > 0;
   }
 
+  // Get all tags for a specific task
   async getTaskTags(taskId) {
-    return await database.all(
-      `SELECT t.* FROM tags t
-       JOIN task_tags tt ON t.id = tt.tagId
-       WHERE tt.taskId = ?`,
-      [taskId],
-    );
+    const { data, error } = await supabase
+      .from("task_tags")
+      .select(`
+        tags: tag_id (id, name, color)
+      `)
+      .eq("task_id", taskId);
+
+    if (error) throw new Error(error.message);
+
+    return data.map((t) => t.tags);
   }
 
+  // Delete a tag
   async delete(id) {
-    const result = await database.run("DELETE FROM tags WHERE id = ?", [id]);
-    return result.changes > 0;
+    const { data, error } = await supabase
+      .from("tags")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw new Error(error.message);
+    return data.length > 0;
   }
 }
 

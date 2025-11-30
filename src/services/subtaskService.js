@@ -28,12 +28,28 @@ class SubtaskService {
     if (!subtask) {
       throw { status: 404, message: "Subtask not found" };
     }
-
-    const task = await taskRepository.getByIdAndUser(subtask.taskId, userId);
+  
+    const task = await taskRepository.getByIdAndUser(subtask.task_id, userId);
     if (!task) {
       throw { status: 403, message: "Access denied" };
     }
-
+  
+    // Validate text if provided
+    if (subtaskData.text && subtaskData.text.trim() === "") {
+      throw { status: 400, message: "Subtask text cannot be empty" };
+    }
+  
+    // Check for duplicate text if text is being changed
+    if (subtaskData.text && subtaskData.text.trim() !== subtask.text) {
+      const duplicateSubtask = await subtaskRepository.findByText(subtask.task_id, subtaskData.text.trim());
+      if (duplicateSubtask && duplicateSubtask.id !== id) {
+        throw { 
+          status: 409, 
+          message: `A subtask with the text "${subtaskData.text}" already exists for this task` 
+        };
+      }
+    }
+  
     return await subtaskRepository.update(id, subtaskData);
   }
 
@@ -42,12 +58,12 @@ class SubtaskService {
     if (!subtask) {
       throw { status: 404, message: "Subtask not found" };
     }
-
-    const task = await taskRepository.getByIdAndUser(subtask.taskId, userId);
+  
+    const task = await taskRepository.getByIdAndUser(subtask.task_id, userId); // Changed from taskId to task_id
     if (!task) {
       throw { status: 403, message: "Access denied" };
     }
-
+  
     await subtaskRepository.delete(id);
     return { message: "Subtask deleted successfully" };
   }
@@ -57,12 +73,12 @@ class SubtaskService {
     if (!subtask) {
       throw { status: 404, message: "Subtask not found" };
     }
-
-    const task = await taskRepository.getByIdAndUser(subtask.taskId, userId);
+  
+    const task = await taskRepository.getByIdAndUser(subtask.task_id, userId); // Changed from taskId to task_id
     if (!task) {
       throw { status: 403, message: "Access denied" };
     }
-
+  
     return await subtaskRepository.toggleComplete(id);
   }
 }

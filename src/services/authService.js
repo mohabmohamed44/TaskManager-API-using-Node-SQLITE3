@@ -100,8 +100,7 @@ class AuthService {
 
   async logoutAll(userId) {
     try {
-      // Revoke all tokens for this user
-      await tokenBlacklistRepository.revokeAllUserTokens(userId);
+      await userRepository.updateTokensValidFrom(userId);
 
       return { message: "All sessions logged out successfully" };
     } catch (error) {

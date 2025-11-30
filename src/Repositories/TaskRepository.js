@@ -1,379 +1,326 @@
-const database = require("../config/database");
+const supabase = require("../config/database");
 
 class TaskRepository {
-  getAll() {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      db.all("SELECT * FROM tasks WHERE isDeleted = 0", (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
-      });
-    });
+  async create(task) {
+    const { userId, title, description, completed, priority, category, dueDate } = task;
+    
+    const { data, error } = await supabase
+      .from("tasks")
+      .insert([{
+        user_id: userId,
+        title,
+        description: description || "",
+        completed: completed || false,
+        priority: priority || "medium",
+        category: category || "general",
+        due_date: dueDate || null
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   }
 
-  getById(id) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      db.get(
-        "SELECT * FROM tasks WHERE id = ? AND isDeleted = 0",
-        [id],
-        (err, row) => {
-          if (err) reject(err);
-          else resolve(row);
-        },
-      );
-    });
+  async getById(id, userId) {
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("id", id)
+      .eq("user_id", userId)
+      .eq("is_deleted", false)
+      .single();
+
+    if (error && error.code !== "PGRST116") throw error;
+    return data;
   }
 
-  create(task) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      const {
-        userId,
+  // Alias for getById to match service expectations
+  async getByIdAndUser(id, userId) {
+    return this.getById(id, userId);
+  }
+
+  async findByTitle(userId, title) {
+    const trimmedTitle = title.trim();
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", userId)
+      .ilike("title", trimmedTitle)
+      .eq("is_deleted", false)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async getAll(userId, filters = {}) {
+    let query = supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("is_deleted", false);
+
+    if (filters.completed !== undefined) {
+      query = query.eq("completed", filters.completed);
+    }
+
+    if (filters.priority) {
+      query = query.eq("priority", filters.priority);
+    }
+
+    if (filters.category) {
+      query = query.eq("category", filters.category);
+    }
+
+    if (filters.search && typeof filters.search === 'string' && filters.search.trim()) {
+      const searchTerm = filters.search.trim();
+      query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+    }
+
+    if (filters.dueDate) {
+      query = query.eq("due_date", filters.dueDate);
+    }
+
+    const sort = filters.sort || "created_at";
+    const order = filters.order || "desc";
+    query = query.order(sort, { ascending: order === "asc" });
+
+    if (filters.limit) {
+      const offset = filters.page ? (filters.page - 1) * filters.limit : 0;
+      query = query.range(offset, offset + filters.limit - 1);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    return data;
+  }
+
+  async count(userId, filters = {}) {
+    let query = supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("is_deleted", false);
+
+    if (filters.completed !== undefined) {
+      query = query.eq("completed", filters.completed);
+    }
+
+    if (filters.priority) {
+      query = query.eq("priority", filters.priority);
+    }
+
+    if (filters.category) {
+      query = query.eq("category", filters.category);
+    }
+
+    const { count, error } = await query;
+
+    if (error) throw error;
+    return count;
+  }
+
+  async update(id, userId, task) {
+    const { title, description, completed, priority, category, dueDate } = task;
+    
+    const { data, error } = await supabase
+      .from("tasks")
+      .update({
         title,
         description,
         completed,
         priority,
         category,
-        dueDate,
-      } = task;
+        due_date: dueDate
+      })
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select()
+      .single();
 
-      db.run(
-        `INSERT INTO tasks (userId, title, description, completed, priority, category, dueDate, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-        [
-          userId,
-          title,
-          description || "",
-          completed ? 1 : 0,
-          priority || "medium",
-          category || "general",
-          dueDate,
-        ],
-        function (err) {
-          if (err) reject(err);
-          else {
-            // Fetch the created task
-            db.get(
-              "SELECT * FROM tasks WHERE id = ?",
-              [this.lastID],
-              (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-              },
-            );
-          }
-        },
-      );
-    });
+    if (error) throw error;
+    return data;
   }
 
-  update(id, task) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      const { title, description, completed, priority, category, dueDate } =
-        task;
+  async softDelete(id, userId) {
+    const { error } = await supabase
+      .from("tasks")
+      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", userId);
 
-      db.run(
-        `UPDATE tasks SET title = ?, description = ?, completed = ?, priority = ?, category = ?, dueDate = ?, updatedAt = CURRENT_TIMESTAMP
-         WHERE id = ? AND isDeleted = 0`,
-        [
-          title,
-          description,
-          completed ? 1 : 0,
-          priority,
-          category,
-          dueDate,
-          id,
-        ],
-        function (err) {
-          if (err) reject(err);
-          else if (this.changes === 0) resolve(null);
-          else {
-            // Fetch the updated task
-            db.get("SELECT * FROM tasks WHERE id = ?", [id], (err, row) => {
-              if (err) reject(err);
-              else resolve(row);
-            });
-          }
-        },
-      );
-    });
+    if (error) throw error;
+    return true;
   }
 
-  delete(id) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      // Soft delete - mark as deleted
-      db.run(
-        "UPDATE tasks SET isDeleted = 1, deletedAt = CURRENT_TIMESTAMP WHERE id = ? AND isDeleted = 0",
-        [id],
-        function (err) {
-          if (err) reject(err);
-          else resolve(this.changes > 0);
-        },
-      );
-    });
+  async restore(id, userId) {
+    const { error } = await supabase
+      .from("tasks")
+      .update({ is_deleted: false, deleted_at: null })
+      .eq("id", id)
+      .eq("user_id", userId);
+
+    if (error) throw error;
+    return true;
   }
 
-  getStatistics(userId) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
+  async getTrash(userId) {
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("is_deleted", true)
+      .order("deleted_at", { ascending: false });
 
-      const queries = {
-        total:
-          "SELECT COUNT(*) as count FROM tasks WHERE userId = ? AND isDeleted = 0",
-        completed:
-          "SELECT COUNT(*) as count FROM tasks WHERE userId = ? AND completed = 1 AND isDeleted = 0",
-        pending:
-          "SELECT COUNT(*) as count FROM tasks WHERE userId = ? AND completed = 0 AND isDeleted = 0",
-        overdue: `SELECT COUNT(*) as count FROM tasks WHERE userId = ? AND dueDate < datetime('now') AND completed = 0 AND isDeleted = 0`,
-        byPriority: `SELECT priority, COUNT(*) as count FROM tasks WHERE userId = ? AND isDeleted = 0 GROUP BY priority`,
-        byCategory: `SELECT category, COUNT(*) as count FROM tasks WHERE userId = ? AND isDeleted = 0 GROUP BY category`,
-      };
-
-      const stats = {};
-      let completed = 0;
-      const total = Object.keys(queries).length;
-
-      Object.entries(queries).forEach(([key, query]) => {
-        if (key === "byPriority" || key === "byCategory") {
-          db.all(query, [userId], (err, rows) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            stats[key] = rows;
-            completed++;
-            if (completed === total) resolve(stats);
-          });
-        } else {
-          db.get(query, [userId], (err, row) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            stats[key] = row.count;
-            completed++;
-            if (completed === total) resolve(stats);
-          });
-        }
-      });
-    });
+    if (error) throw error;
+    return data;
   }
 
-  search(query, userId) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      const {
-        q,
-        completed,
-        priority,
-        category,
-        sortBy = "createdAt",
-        sortOrder = "DESC",
-      } = query;
+  async permanentDelete(id, userId) {
+    const { error } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId);
 
-      let sql = "SELECT * FROM tasks WHERE userId = ? AND isDeleted = 0";
-      const params = [userId];
-
-      if (q) {
-        sql += " AND (title LIKE ? OR description LIKE ?)";
-        params.push(`%${q}%`, `%${q}%`);
-      }
-
-      if (completed !== undefined) {
-        sql += " AND completed = ?";
-        params.push(completed === "true" ? 1 : 0);
-      }
-
-      if (priority) {
-        sql += " AND priority = ?";
-        params.push(priority);
-      }
-
-      if (category) {
-        sql += " AND category = ?";
-        params.push(category);
-      }
-
-      sql += ` ORDER BY ${sortBy} ${sortOrder}`;
-
-      db.all(sql, params, (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
-      });
-    });
+    if (error) throw error;
+    return true;
   }
 
-  getShared(userId) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      const sql = `
-        SELECT t.*, ts.permission, u.name as ownerName, u.email as ownerEmail
-        FROM tasks t
-        JOIN task_sharing ts ON t.id = ts.taskId
-        JOIN users u ON ts.ownerId = u.id
-        WHERE ts.sharedWithId = ? AND t.isDeleted = 0
-        ORDER BY t.createdAt DESC
-      `;
+  async bulkUpdate(taskIds, userId, updates) {
+    if (!taskIds || taskIds.length === 0) {
+      throw { status: 400, message: "taskIds array cannot be empty" };
+    }
 
-      db.all(sql, [userId], (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
-      });
-    });
+    const updateData = {};
+    
+    if (updates.completed !== undefined) {
+      updateData.completed = updates.completed;
+    }
+    if (updates.priority) {
+      updateData.priority = updates.priority;
+    }
+    if (updates.category !== undefined) {
+      updateData.category = updates.category;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      throw { status: 400, message: "No valid fields to update" };
+    }
+
+    const { data, error } = await supabase
+      .from("tasks")
+      .update(updateData)
+      .in("id", taskIds)
+      .eq("user_id", userId)
+      .eq("is_deleted", false)
+      .select();
+
+    if (error) {
+      throw { status: 500, message: error.message || "Failed to update tasks" };
+    }
+    return data.length;
   }
 
-  getTrash(userId) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      db.all(
-        "SELECT * FROM tasks WHERE userId = ? AND isDeleted = 1 ORDER BY deletedAt DESC",
-        [userId],
-        (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows);
-        },
-      );
-    });
+  async bulkDelete(taskIds, userId) {
+    if (!taskIds || taskIds.length === 0) {
+      throw { status: 400, message: "taskIds array cannot be empty" };
+    }
+
+    const { data, error } = await supabase
+      .from("tasks")
+      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+      .in("id", taskIds)
+      .eq("user_id", userId)
+      .eq("is_deleted", false)
+      .select();
+
+    if (error) {
+      throw { status: 500, message: error.message || "Failed to delete tasks" };
+    }
+    return data.length;
   }
 
-  restore(id, userId) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      db.run(
-        "UPDATE tasks SET isDeleted = 0, deletedAt = NULL, updatedAt = CURRENT_TIMESTAMP WHERE id = ? AND userId = ? AND isDeleted = 1",
-        [id, userId],
-        function (err) {
-          if (err) reject(err);
-          else if (this.changes === 0) resolve(null);
-          else {
-            // Fetch the restored task
-            db.get("SELECT * FROM tasks WHERE id = ?", [id], (err, row) => {
-              if (err) reject(err);
-              else resolve(row);
-            });
-          }
-        },
-      );
-    });
+  async getSharedTasks(userId) {
+    const { data, error } = await supabase
+      .from("task_sharing")
+      .select(`
+        *,
+        tasks(*),
+        owner:users!task_sharing_owner_id_fkey(email, name)
+      `)
+      .eq("shared_with_id", userId);
+
+    if (error) throw error;
+    return data.map(item => ({
+      ...item.tasks,
+      ownerEmail: item.owner.email,
+      ownerName: item.owner.name,
+      permission: item.permission
+    }));
   }
 
-  permanentDelete(id, userId) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      db.run(
-        "DELETE FROM tasks WHERE id = ? AND userId = ? AND isDeleted = 1",
-        [id, userId],
-        function (err) {
-          if (err) reject(err);
-          else resolve(this.changes > 0);
-        },
-      );
-    });
-  }
+  async getStatistics(userId) {
+    const stats = {};
 
-  bulkUpdate(taskIds, updates, userId) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      const placeholders = taskIds.map(() => "?").join(",");
-      const setClauses = [];
-      const params = [];
+    // Total tasks
+    const { count: total } = await supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("is_deleted", false);
+    stats.total = total;
 
-      // Build SET clauses based on updates
-      if (updates.completed !== undefined) {
-        setClauses.push("completed = ?");
-        params.push(updates.completed ? 1 : 0);
-      }
-      if (updates.priority) {
-        setClauses.push("priority = ?");
-        params.push(updates.priority);
-      }
-      if (updates.category) {
-        setClauses.push("category = ?");
-        params.push(updates.category);
-      }
-      if (updates.dueDate !== undefined) {
-        setClauses.push("dueDate = ?");
-        params.push(updates.dueDate);
-      }
+    // Completed tasks
+    const { count: completed } = await supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("completed", true)
+      .eq("is_deleted", false);
+    stats.completed = completed;
 
-      if (setClauses.length === 0) {
-        resolve({ updated: 0, message: "No valid updates provided" });
-        return;
-      }
+    stats.pending = stats.total - stats.completed;
 
-      setClauses.push("updatedAt = CURRENT_TIMESTAMP");
-      params.push(...taskIds, userId);
+    // Overdue tasks
+    const { count: overdue } = await supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("completed", false)
+      .eq("is_deleted", false)
+      .lt("due_date", new Date().toISOString());
+    stats.overdue = overdue;
 
-      const sql = `
-        UPDATE tasks
-        SET ${setClauses.join(", ")}
-        WHERE id IN (${placeholders}) AND userId = ? AND isDeleted = 0
-      `;
+    stats.completionRate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
 
-      db.run(sql, params, function (err) {
-        if (err) reject(err);
-        else
-          resolve({
-            updated: this.changes,
-            message: `${this.changes} tasks updated`,
-          });
-      });
-    });
-  }
+    // By priority
+    const { data: byPriority } = await supabase
+      .from("tasks")
+      .select("priority")
+      .eq("user_id", userId)
+      .eq("is_deleted", false);
+    
+    stats.byPriority = byPriority.reduce((acc, row) => {
+      acc[row.priority] = (acc[row.priority] || 0) + 1;
+      return acc;
+    }, {});
 
-  bulkDelete(taskIds, userId) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      const placeholders = taskIds.map(() => "?").join(",");
-      const params = [...taskIds, userId];
+    // By category
+    const { data: byCategory } = await supabase
+      .from("tasks")
+      .select("category")
+      .eq("user_id", userId)
+      .eq("is_deleted", false);
+    
+    stats.byCategory = byCategory.reduce((acc, row) => {
+      acc[row.category] = (acc[row.category] || 0) + 1;
+      return acc;
+    }, {});
 
-      const sql = `
-        UPDATE tasks
-        SET isDeleted = 1, deletedAt = CURRENT_TIMESTAMP
-        WHERE id IN (${placeholders}) AND userId = ? AND isDeleted = 0
-      `;
-
-      db.run(sql, params, function (err) {
-        if (err) reject(err);
-        else
-          resolve({
-            deleted: this.changes,
-            message: `${this.changes} tasks moved to trash`,
-          });
-      });
-    });
-  }
-
-  // Additional helper methods for user-specific queries
-  getAllByUser(userId) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      db.all(
-        "SELECT * FROM tasks WHERE userId = ? AND isDeleted = 0 ORDER BY createdAt DESC",
-        [userId],
-        (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows);
-        },
-      );
-    });
-  }
-
-  getByIdAndUser(id, userId) {
-    return new Promise((resolve, reject) => {
-      const db = database.getConnection();
-      db.get(
-        "SELECT * FROM tasks WHERE id = ? AND userId = ? AND isDeleted = 0",
-        [id, userId],
-        (err, row) => {
-          if (err) reject(err);
-          else resolve(row);
-        },
-      );
-    });
+    return stats;
   }
 }
 

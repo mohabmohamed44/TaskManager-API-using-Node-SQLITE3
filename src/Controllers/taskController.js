@@ -21,7 +21,7 @@ class TaskController {
 
   async createTask(req, res, next) {
     try {
-      const task = await taskService.createTask(req.body, req.user.id);
+      const task = await taskService.createTask(req.user.id, req.body);
       res.status(201).json(task);
     } catch (error) {
       next(error);
@@ -32,8 +32,8 @@ class TaskController {
     try {
       const task = await taskService.updateTask(
         req.params.id,
-        req.body,
         req.user.id,
+        req.body,
       );
       res.json(task);
     } catch (error) {
@@ -61,7 +61,7 @@ class TaskController {
 
   async searchTasks(req, res, next) {
     try {
-      const tasks = await taskService.searchTasks(req.query, req.user.id);
+      const tasks = await taskService.searchTasks(req.user.id, req.query);
       res.json(tasks);
     } catch (error) {
       next(error);
@@ -109,7 +109,27 @@ class TaskController {
 
   async bulkUpdate(req, res, next) {
     try {
-      const result = await taskService.bulkUpdate(req.body, req.user.id);
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const { taskIds, updates } = req.body;
+
+      if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+        return res.status(400).json({ error: "taskIds must be a non-empty array" });
+      }
+
+      if (!updates || typeof updates !== "object" || Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: "updates object is required and cannot be empty" });
+      }
+
+      // Validate taskIds are all numbers
+      const invalidIds = taskIds.filter(id => isNaN(parseInt(id)));
+      if (invalidIds.length > 0) {
+        return res.status(400).json({ error: "All taskIds must be valid numbers" });
+      }
+
+      const result = await taskService.bulkUpdate(req.user.id, taskIds, updates);
       res.json(result);
     } catch (error) {
       next(error);
@@ -118,7 +138,23 @@ class TaskController {
 
   async bulkDelete(req, res, next) {
     try {
-      const result = await taskService.bulkDelete(req.body, req.user.id);
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const { taskIds } = req.body;
+
+      if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+        return res.status(400).json({ error: "taskIds must be a non-empty array" });
+      }
+
+      // Validate taskIds are all numbers
+      const invalidIds = taskIds.filter(id => isNaN(parseInt(id)));
+      if (invalidIds.length > 0) {
+        return res.status(400).json({ error: "All taskIds must be valid numbers" });
+      }
+
+      const result = await taskService.bulkDelete(req.user.id, taskIds);
       res.json(result);
     } catch (error) {
       next(error);

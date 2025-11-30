@@ -1,6 +1,15 @@
 const errorHandler = (err, req, res, next) => {
   console.error("Error:", err);
 
+  // Handle service layer errors with status and message
+  if (err.status && err.message) {
+    return res.status(err.status).json({
+      error: err.status >= 500 ? "Internal Server Error" : err.message,
+      ...(err.status < 500 && { message: err.message }),
+      ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
+    });
+  }
+
   if (err.isOperational) {
     return res.status(err.statusCode).json({
       error: err.message,
@@ -37,9 +46,27 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
+  // Handle Supabase storage errors
+  if (err.message && typeof err.message === 'string') {
+    if (err.message.includes("Bucket not found") || err.message.includes("The resource was not found")) {
+      return res.status(500).json({
+        error: "Storage configuration error",
+        message: "Storage bucket 'images' not found. Please create it in Supabase Dashboard."
+      });
+    }
+    
+    if (err.message.includes("column") && err.message.includes("file_url")) {
+      return res.status(500).json({
+        error: "Database schema error",
+        message: "The 'file_url' column is missing. Please add it to the attachments table."
+      });
+    }
+  }
+
   res.status(500).json({
     error: "Internal Server Error",
     ...(process.env.NODE_ENV === "development" && { message: err.message }),
+    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });
 };
 

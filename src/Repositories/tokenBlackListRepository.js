@@ -1,35 +1,48 @@
-const database = require("../config/database");
+const supabase = require("../config/database");
 
 class TokenBlacklistRepository {
   async addToBlacklist(token, userId, expiresAt) {
-    const result = await database.run(
-      "INSERT INTO token_blacklist (token, userId, expiresAt) VALUES (?, ?, ?)",
-      [token, userId, expiresAt]
-    );
-    return result.lastID;
+    const { data, error } = await supabase
+      .from("token_blacklist")
+      .insert([{ token, user_id: userId, expires_at: expiresAt }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data.id;
   }
 
   async isBlacklisted(token) {
-    const result = await database.get(
-      "SELECT * FROM token_blacklist WHERE token = ? AND expiresAt > datetime('now')",
-      [token]
-    );
-    return !!result;
+    const { data, error } = await supabase
+      .from("token_blacklist")
+      .select("*")
+      .eq("token", token)
+      .gt("expires_at", new Date().toISOString())
+      .single();
+
+    if (error && error.code !== "PGRST116") throw error;
+    return !!data;
   }
 
   async removeExpiredTokens() {
-    const result = await database.run(
-      "DELETE FROM token_blacklist WHERE expiresAt <= datetime('now')"
-    );
-    return result.changes;
+    const { data, error } = await supabase
+      .from("token_blacklist")
+      .delete()
+      .lte("expires_at", new Date().toISOString())
+      .select();
+
+    if (error) throw error;
+    return data ? data.length : 0;
   }
 
   async revokeAllUserTokens(userId) {
-    const result = await database.run(
-      "UPDATE token_blacklist SET expiresAt = datetime('now') WHERE userId = ?",
-      [userId]
-    );
-    return result.changes;
+    const { error } = await supabase
+      .from("token_blacklist")
+      .update({ expires_at: new Date().toISOString() })
+      .eq("user_id", userId);
+
+    if (error) throw error;
+    return true;
   }
 }
 

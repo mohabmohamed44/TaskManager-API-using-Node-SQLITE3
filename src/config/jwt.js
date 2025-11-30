@@ -5,6 +5,11 @@ const JWT_SECRET =
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d";
 const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || "30d";
 
+// Warn if using default secret in production
+if (process.env.NODE_ENV === "production" && JWT_SECRET === "your-secret-key-change-in-production") {
+  console.warn("⚠️  WARNING: Using default JWT_SECRET in production! This is a security risk!");
+}
+
 class JWTConfig {
   generateToken(payload) {
     return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -15,17 +20,28 @@ class JWTConfig {
   }
 
   verifyToken(token) {
+    if (!token || typeof token !== "string" || token.trim().length === 0) {
+      throw new Error("Token is required");
+    }
+
     try {
-      return jwt.verify(token, JWT_SECRET);
+      return jwt.verify(token.trim(), JWT_SECRET);
     } catch (error) {
+      // Re-throw the original error to preserve error name and message
       if (error.name === "TokenExpiredError") {
-        throw new Error("Token has expired");
+        const expiredError = new Error("Token has expired");
+        expiredError.name = "TokenExpiredError";
+        throw expiredError;
       } else if (error.name === "JsonWebTokenError") {
-        throw new Error("Invalid token");
+        const invalidError = new Error(error.message || "Invalid token");
+        invalidError.name = "JsonWebTokenError";
+        throw invalidError;
       } else if (error.name === "NotBeforeError") {
-        throw new Error("Token not active");
+        const notBeforeError = new Error("Token not active");
+        notBeforeError.name = "NotBeforeError";
+        throw notBeforeError;
       }
-      throw new Error("Token verification failed");
+      throw error;
     }
   }
 

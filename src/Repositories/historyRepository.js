@@ -1,32 +1,60 @@
-const database = require("../config/database");
+const supabase  = require("../config/database");
 
 class HistoryRepository {
+  // Generic create history entry
   async create(history) {
-    const { taskId, userId, action, field, oldValue, newValue } = history;
-    const result = await database.run(
-      "INSERT INTO task_history (taskId, userId, action, field, oldValue, newValue) VALUES (?, ?, ?, ?, ?, ?)",
-      [taskId, userId, action, field || null, oldValue || null, newValue || null]
-    );
-    return result.lastID;
-  }
-
-  async getByTaskId(taskId) {
-    return await database.all(
-      `SELECT h.*, u.name as userName, u.email as userEmail
-       FROM task_history h
-       JOIN users u ON h.userId = u.id
-       WHERE h.taskId = ?
-       ORDER BY h.createdAt DESC`,
-      [taskId]
-    );
-  }
-
-  async logTaskCreation(taskId, userId) {
-    return this.create({
+    const {
       taskId,
       userId,
-      action: "created",
-    });
+      action,
+      field = null,
+      oldValue = null,
+      newValue = null,
+    } = history;
+
+    const { data, error } = await supabase
+      .from("task_history")
+      .insert([
+        {
+          task_id: taskId,
+          user_id: userId,
+          action,
+          field,
+          old_value: oldValue,
+          new_value: newValue,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return data.id; // return inserted ID
+  }
+
+  // Get all history for a task (with user info)
+  async getByTaskId(taskId) {
+    const { data, error } = await supabase
+      .from("task_history")
+      .select(`
+        *,
+        users: user_id (name, email)
+      `)
+      .eq("task_id", taskId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error(error.message);
+
+    // Flatten user info
+    return data.map((h) => ({
+      ...h,
+      userName: h.users?.name,
+      userEmail: h.users?.email,
+    }));
+  }
+
+  // Shortcut methods for logging actions
+  async logTaskCreation(taskId, userId) {
+    return this.create({ taskId, userId, action: "created" });
   }
 
   async logTaskUpdate(taskId, userId, field, oldValue, newValue) {
@@ -49,11 +77,7 @@ class HistoryRepository {
   }
 
   async logTaskDeletion(taskId, userId) {
-    return this.create({
-      taskId,
-      userId,
-      action: "deleted",
-    });
+    return this.create({ taskId, userId, action: "deleted" });
   }
 }
 

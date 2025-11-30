@@ -1,9 +1,12 @@
 const commentRepository = require("../Repositories/commentRepository");
 const taskRepository = require("../Repositories/TaskRepository");
+const sharingRepository = require("../Repositories/sharingRepository");
 
 class CommentService {
   async createComment(taskId, userId, text) {
-    const task = await taskRepository.getByIdAndUser(taskId, userId);
+    // Verify user has access to the task (either as owner or shared user)
+    const task = await taskRepository.getById(taskId);
+    const hasAccess = task && (task.user_id === userId || await sharingRepository.hasAccess(taskId, userId));
     if (!task) {
       throw { status: 404, message: "Task not found" };
     }
@@ -16,7 +19,9 @@ class CommentService {
   }
 
   async getComments(taskId, userId) {
-    const task = await taskRepository.getByIdAndUser(taskId, userId);
+    // Verify user has access to the task
+    const task = await taskRepository.getById(taskId);
+    const hasAccess = task && (task.user_id === userId || await sharingRepository.hasAccess(taskId, userId));
     if (!task) {
       throw { status: 404, message: "Task not found" };
     }
@@ -30,7 +35,8 @@ class CommentService {
       throw { status: 404, message: "Comment not found" };
     }
 
-    if (comment.userId !== userId) {
+    // repository returns DB column names (snake_case) such as user_id
+    if (comment.user_id !== userId) {
       throw { status: 403, message: "You can only edit your own comments" };
     }
 
@@ -43,7 +49,7 @@ class CommentService {
       throw { status: 404, message: "Comment not found" };
     }
 
-    if (comment.userId !== userId) {
+    if (comment.user_id !== userId) {
       throw { status: 403, message: "You can only delete your own comments" };
     }
 

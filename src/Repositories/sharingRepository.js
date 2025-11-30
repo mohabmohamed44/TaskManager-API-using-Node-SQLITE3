@@ -1,47 +1,81 @@
-const database = require("../config/database");
+const supabase = require("../config/database");
 
 class SharingRepository {
   async shareTask(taskId, ownerId, sharedWithId, permission) {
-    const result = await database.run(
-      "INSERT INTO task_sharing (taskId, ownerId, sharedWithId, permission) VALUES (?, ?, ?, ?)",
-      [taskId, ownerId, sharedWithId, permission || "view"]
-    );
-    return result.lastID;
+    const { data, error } = await supabase
+      .from("task_sharing")
+      .insert([{
+        task_id: taskId,
+        owner_id: ownerId,
+        shared_with_id: sharedWithId,
+        permission: permission || "view"
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      // Handle duplicate entry error
+      if (error.code === "23505" || error.message?.includes("duplicate") || error.message?.includes("unique")) {
+        throw { 
+          status: 409, 
+          message: "Task is already shared with this user" 
+        };
+      }
+      throw { status: 500, message: error.message || "Failed to share task" };
+    }
+    return data.id;
   }
 
   async unshareTask(taskId, sharedWithId) {
-    const result = await database.run(
-      "DELETE FROM task_sharing WHERE taskId = ? AND sharedWithId = ?",
-      [taskId, sharedWithId]
-    );
-    return result.changes > 0;
+    const { error } = await supabase
+      .from("task_sharing")
+      .delete()
+      .eq("task_id", taskId)
+      .eq("shared_with_id", sharedWithId);
+
+    if (error) throw error;
+    return true;
   }
 
   async getSharedUsers(taskId) {
-    return await database.all(
-      `SELECT u.id, u.email, u.name, ts.permission
-       FROM task_sharing ts
-       JOIN users u ON ts.sharedWithId = u.id
-       WHERE ts.taskId = ?`,
-      [taskId]
-    );
+    const { data, error } = await supabase
+      .from("task_sharing")
+      .select(`
+        permission,
+        user:users!task_sharing_shared_with_id_fkey(id, email, name)
+      `)
+      .eq("task_id", taskId);
+
+    if (error) throw error;
+    return data.map(item => ({
+      id: item.user.id,
+      email: item.user.email,
+      name: item.user.name,
+      permission: item.permission
+    }));
   }
 
   async hasAccess(taskId, userId) {
-    const result = await database.get(
-      `SELECT permission FROM task_sharing 
-       WHERE taskId = ? AND sharedWithId = ?`,
-      [taskId, userId]
-    );
-    return result || null;
+    const { data, error } = await supabase
+      .from("task_sharing")
+      .select("permission")
+      .eq("task_id", taskId)
+      .eq("shared_with_id", userId)
+      .single();
+
+    if (error && error.code !== "PGRST116") throw error;
+    return data || null;
   }
 
   async updatePermission(taskId, sharedWithId, permission) {
-    const result = await database.run(
-      "UPDATE task_sharing SET permission = ? WHERE taskId = ? AND sharedWithId = ?",
-      [permission, taskId, sharedWithId]
-    );
-    return result.changes > 0;
+    const { error } = await supabase
+      .from("task_sharing")
+      .update({ permission })
+      .eq("task_id", taskId)
+      .eq("shared_with_id", sharedWithId);
+
+    if (error) throw error;
+    return true;
   }
 }
 

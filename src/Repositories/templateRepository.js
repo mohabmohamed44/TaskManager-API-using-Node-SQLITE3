@@ -1,38 +1,79 @@
-const database = require("../config/database");
+const supabase = require("../config/database");
 
 class TemplateRepository {
   async create(template) {
     const { userId, name, title, description, priority, category } = template;
-    const result = await database.run(
-      "INSERT INTO templates (userId, name, title, description, priority, category) VALUES (?, ?, ?, ?, ?, ?)",
-      [userId, name, title, description || "", priority || "medium", category || "general"]
-    );
-    return this.getById(result.lastID);
+
+    const { data, error } = await supabase
+      .from("templates")
+      .insert([
+        {
+          user_id: userId,
+          name,
+          title,
+          description: description || "",
+          priority: priority || "medium",
+          category: category || "general",
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return data;
   }
 
   async getById(id) {
-    return await database.get("SELECT * FROM templates WHERE id = ?", [id]);
+    const { data, error } = await supabase
+      .from("templates")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) return null;
+    return data;
   }
 
   async getByUserId(userId) {
-    return await database.all(
-      "SELECT * FROM templates WHERE userId = ? ORDER BY createdAt DESC",
-      [userId]
-    );
+    const { data, error } = await supabase
+      .from("templates")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return data;
   }
 
   async update(id, template) {
     const { name, title, description, priority, category } = template;
-    await database.run(
-      "UPDATE templates SET name = ?, title = ?, description = ?, priority = ?, category = ? WHERE id = ?",
-      [name, title, description, priority, category, id]
-    );
-    return this.getById(id);
+
+    const { data, error } = await supabase
+      .from("templates")
+      .update({
+        name,
+        title,
+        description,
+        priority,
+        category,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return data;
   }
 
   async delete(id) {
-    const result = await database.run("DELETE FROM templates WHERE id = ?", [id]);
-    return result.changes > 0;
+    const { data, error } = await supabase
+      .from("templates")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw new Error(error.message);
+    return data.length > 0;
   }
 }
 

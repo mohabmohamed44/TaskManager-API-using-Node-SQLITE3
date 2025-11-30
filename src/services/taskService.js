@@ -1,162 +1,243 @@
 const taskRepository = require("../Repositories/TaskRepository");
+const historyRepository = require("../Repositories/historyRepository");
+const tagRepository = require("../Repositories/tagRepository");
 
 class TaskService {
-  async getAllTasks(userId) {
-    if (!userId) {
-      throw { status: 400, message: "User ID is required" };
+  async getAllTasks(userId, filters= {}) {
+    const tasks = await taskRepository.getAll(userId, filters);
+    
+    if (filters.limit) {
+      const total = await taskRepository.count(userId, filters);
+      const totalPages = Math.ceil(total / filters.limit);
+      
+      return {
+        tasks,
+        pagination: {
+          currentPage: parseInt(filters.page) || 1,
+          totalPages,
+          totalItems: total,
+          itemsPerPage: parseInt(filters.limit),
+        },
+      };
     }
-    return await taskRepository.getAllByUser(userId);
+    
+    return { tasks };
   }
 
   async getTaskById(id, userId) {
-    if (!userId) {
-      throw { status: 400, message: "User ID is required" };
-    }
-
-    const task = await taskRepository.getByIdAndUser(id, userId);
+    const task = await taskRepository.getById(id, userId);
     if (!task) {
       throw { status: 404, message: "Task not found" };
     }
-    return task;
+
+    const tags = await tagRepository.getTaskTags(id);
+    return { ...task, tags };
   }
 
-  async createTask(taskData, userId) {
-    if (!userId) {
-      throw { status: 400, message: "User ID is required" };
-    }
-
-    // Business logic: validate title
+  async createTask(userId, taskData) {
     if (!taskData.title || taskData.title.trim() === "") {
       throw { status: 400, message: "Title is required" };
     }
 
-    // Add userId to task data
-    const taskWithUser = { ...taskData, userId };
-
-    try {
-      return await taskRepository.create(taskWithUser);
-    } catch (error) {
-      if (error.message.includes("UNIQUE constraint failed")) {
-        throw { status: 409, message: "Task with this title already exists" };
-      }
-      throw error;
+    // Check if a task with the same title already exists for this user
+    const existingTask = await taskRepository.findByTitle(userId, taskData.title.trim());
+    if (existingTask) {
+      throw { 
+        status: 409, 
+        message: `A task with the title "${taskData.title}" already exists` 
+      };
     }
+
+    const task = await taskRepository.create({
+      userId,
+      ...taskData,
+    });
+
+    await historyRepository.logTaskCreation(task.id, userId);
+
+    if (taskData.tags && taskData.tags.length > 0) {
+      for (const tagName of taskData.tags) {
+        let tag = await tagRepository.getByName(tagName);
+        if (!tag) {
+          tag = await tagRepository.create({ name: tagName });
+        }
+        await tagRepository.addTagToTask(task.id, tag.id);
+      }
+    }
+
+    return task;
   }
 
-  async updateTask(id, taskData, userId) {
-    if (!userId) {
-      throw { status: 400, message: "User ID is required" };
-    }
-
-    // Business logic: validate title if provided
-    if (
-      taskData.title !== undefined &&
-      (!taskData.title || taskData.title.trim() === "")
-    ) {
-      throw { status: 400, message: "Title is required" };
-    }
-
-    const updatedTask = await taskRepository.update(id, taskData);
-    if (!updatedTask) {
+  async updateTask(id, userId, taskData) {
+    const existingTask = await taskRepository.getById(id, userId);
+    if (!existingTask) {
       throw { status: 404, message: "Task not found" };
     }
+
+    if (taskData.title && taskData.title.trim() === "") {
+      throw { status: 400, message: "Title cannot be empty" };
+    }
+
+    // Check for duplicate title if title is being changed
+    if (taskData.title && taskData.title.trim() !== existingTask.title) {
+      const duplicateTask = await taskRepository.findByTitle(userId, taskData.title.trim());
+      if (duplicateTask && duplicateTask.id !== id) {
+        throw { 
+          status: 409, 
+          message: `A task with the title "${taskData.title}" already exists` 
+        };
+      }
+    }
+
+    for (const [key, value] of Object.entries(taskData)) {
+      if (existingTask[key] !== value && key !== "tags") {
+        await historyRepository.logTaskUpdate(id, userId, key, existingTask[key], value);
+      }
+    }
+
+    if (taskData.completed !== undefined && taskData.completed !== existingTask.completed) {
+      await historyRepository.logTaskCompletion(id, userId, taskData.completed);
+    }
+
+    const updatedTask = await taskRepository.update(id, userId, {
+      title: taskData.title !== undefined ? taskData.title : existingTask.title,
+      description: taskData.description !== undefined ? taskData.description : existingTask.description,
+      completed: taskData.completed !== undefined ? taskData.completed : existingTask.completed,
+      priority: taskData.priority !== undefined ? taskData.priority : existingTask.priority,
+      category: taskData.category !== undefined ? taskData.category : existingTask.category,
+      dueDate: taskData.dueDate !== undefined ? taskData.dueDate : existingTask.due_date,
+    });
+
     return updatedTask;
   }
 
   async deleteTask(id, userId) {
-    if (!userId) {
-      throw { status: 400, message: "User ID is required" };
-    }
-
-    const deleted = await taskRepository.delete(id);
-    if (!deleted) {
+    const task = await taskRepository.getById(id, userId);
+    if (!task) {
       throw { status: 404, message: "Task not found" };
     }
-    return { message: `Task with id ${id} moved to trash successfully` };
-  }
 
-  async getStatistics(userId) {
-    if (!userId) {
-      throw { status: 400, message: "User ID is required" };
-    }
-    // Get task statistics for a user
-    const stats = await taskRepository.getStatistics(userId);
-    return stats;
-  }
+    await taskRepository.softDelete(id, userId);
+    await historyRepository.logTaskDeletion(id, userId);
 
-  async searchTasks(query, userId) {
-    if (!userId) {
-      throw { status: 400, message: "User ID is required" };
-    }
-    // Search tasks based on query parameters
-    return await taskRepository.search(query, userId);
-  }
-
-  async getSharedTasks(userId) {
-    if (!userId) {
-      throw { status: 400, message: "User ID is required" };
-    }
-    // Get tasks shared with the user
-    return await taskRepository.getShared(userId);
-  }
-
-  async getTrash(userId) {
-    if (!userId) {
-      throw { status: 400, message: "User ID is required" };
-    }
-    // Get soft-deleted tasks
-    return await taskRepository.getTrash(userId);
+    return { message: `Task moved to trash` };
   }
 
   async restoreTask(id, userId) {
-    if (!userId) {
-      throw { status: 400, message: "User ID is required" };
-    }
-    // Restore a soft-deleted task
-    const task = await taskRepository.restore(id, userId);
-    if (!task) {
+    const restored = await taskRepository.restore(id, userId);
+    if (!restored) {
       throw { status: 404, message: "Task not found in trash" };
     }
-    return task;
+    return { message: "Task restored successfully" };
+  }
+
+  async getTrash(userId) {
+    return await taskRepository.getTrash(userId);
   }
 
   async permanentDelete(id, userId) {
-    if (!userId) {
-      throw { status: 400, message: "User ID is required" };
-    }
-    // Permanently delete a task
     const deleted = await taskRepository.permanentDelete(id, userId);
     if (!deleted) {
       throw { status: 404, message: "Task not found" };
     }
-    return { message: `Task with id ${id} permanently deleted` };
+    return { message: "Task permanently deleted" };
   }
 
-  async bulkUpdate(data, userId) {
-    if (!userId) {
-      throw { status: 400, message: "User ID is required" };
-    }
-    // Update multiple tasks at once
-    const { taskIds, updates } = data;
+  async bulkUpdate(userId, taskIds, updates) {
+    // Validate inputs
     if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
-      throw { status: 400, message: "Task IDs array is required" };
+      throw { status: 400, message: "taskIds must be a non-empty array" };
     }
-    if (!updates || typeof updates !== "object") {
-      throw { status: 400, message: "Updates object is required" };
+
+    if (!updates || typeof updates !== "object" || Object.keys(updates).length === 0) {
+      throw { status: 400, message: "updates object is required and cannot be empty" };
     }
-    return await taskRepository.bulkUpdate(taskIds, updates, userId);
+
+    // Validate allowed update fields
+    const allowedFields = ["completed", "priority", "category"];
+    const updateFields = Object.keys(updates);
+    const invalidFields = updateFields.filter(field => !allowedFields.includes(field));
+    
+    if (invalidFields.length > 0) {
+      throw { 
+        status: 400, 
+        message: `Invalid update fields: ${invalidFields.join(", ")}. Allowed fields: ${allowedFields.join(", ")}` 
+      };
+    }
+
+    // Validate priority value if provided
+    if (updates.priority && !["low", "medium", "high", "urgent"].includes(updates.priority)) {
+      throw { 
+        status: 400, 
+        message: "Priority must be one of: low, medium, high, urgent" 
+      };
+    }
+
+    // Validate completed is boolean if provided
+    if (updates.completed !== undefined && typeof updates.completed !== "boolean") {
+      throw { 
+        status: 400, 
+        message: "completed must be a boolean value" 
+      };
+    }
+
+    // Check if all tasks belong to the user
+    const tasks = await Promise.all(
+      taskIds.map(id => taskRepository.getById(id, userId))
+    );
+    
+    const notFoundTasks = tasks.filter((task, index) => !task);
+    if (notFoundTasks.length > 0) {
+      throw { 
+        status: 404, 
+        message: `${notFoundTasks.length} task(s) not found or you don't have access to them` 
+      };
+    }
+
+    const count = await taskRepository.bulkUpdate(taskIds, userId, updates);
+    return { message: `${count} task(s) updated successfully`, count };
   }
 
-  async bulkDelete(data, userId) {
-    if (!userId) {
-      throw { status: 400, message: "User ID is required" };
-    }
-    // Delete multiple tasks at once
-    const { taskIds } = data;
+  async bulkDelete(userId, taskIds) {
+    // Validate inputs
     if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
-      throw { status: 400, message: "Task IDs array is required" };
+      throw { status: 400, message: "taskIds must be a non-empty array" };
     }
-    return await taskRepository.bulkDelete(taskIds, userId);
+
+    // Check if all tasks belong to the user
+    const tasks = await Promise.all(
+      taskIds.map(id => taskRepository.getById(id, userId))
+    );
+    
+    const notFoundTasks = tasks.filter((task, index) => !task);
+    if (notFoundTasks.length > 0) {
+      throw { 
+        status: 404, 
+        message: `${notFoundTasks.length} task(s) not found or you don't have access to them` 
+      };
+    }
+
+    const count = await taskRepository.bulkDelete(taskIds, userId);
+    return { message: `${count} task(s) moved to trash successfully`, count };
+  }
+
+  async getStatistics(userId) {
+    return await taskRepository.getStatistics(userId);
+  }
+
+  async getSharedTasks(userId) {
+    return await taskRepository.getSharedTasks(userId);
+  }
+
+  async searchTasks(userId, query) {
+    // Extract search term from query object (could be 'q', 'query', or 'search')
+    const searchTerm = query.q || query.query || query.search || "";
+    
+    if (!searchTerm || searchTerm.trim() === "") {
+      throw { status: 400, message: "Search query is required" };
+    }
+    
+    return await taskRepository.getAll(userId, { search: searchTerm.trim() });
   }
 }
 

@@ -1,44 +1,72 @@
-const database = require("../config/database");
+const supabase = require("../config/database");
 
 class UserRepository {
   async create(user) {
     const { email, password, name, role } = user;
-    const result = await database.run(
-      "INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)",
-      [email, password, name || null, role || "user"],
-    );
-    return this.getById(result.lastID);
+    
+    const { data, error } = await supabase
+      .from("users")
+      .insert([{ email, password, name, role: role || "user" }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   }
 
   async getById(id) {
-    return await database.get(
-      "SELECT id, email, name, role, createdAt, updatedAt FROM users WHERE id = ?",
-      [id],
-    );
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, email, name, role, created_at, updated_at")
+      .eq("id", id)
+      .single();
+
+    if (error && error.code !== "PGRST116") throw error;
+    return data;
   }
 
   async getByEmail(email) {
-    return await database.get("SELECT * FROM users WHERE email = ?", [email]);
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .single();
+
+    if (error && error.code !== "PGRST116") throw error;
+    return data;
   }
 
   async getAll() {
-    return await database.all(
-      "SELECT id, email, name, role, createdAt FROM users",
-    );
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, email, name, role, created_at");
+
+    if (error) throw error;
+    return data;
   }
 
   async update(id, user) {
     const { name, role } = user;
-    await database.run(
-      "UPDATE users SET name = ?, role = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?",
-      [name, role, id],
-    );
-    return this.getById(id);
+    
+    const { data, error } = await supabase
+      .from("users")
+      .update({ name, role })
+      .eq("id", id)
+      .select("id, email, name, role, created_at, updated_at")
+      .single();
+
+    if (error) throw error;
+    return data;
   }
 
   async delete(id) {
-    const result = await database.run("DELETE FROM users WHERE id = ?", [id]);
-    return result.changes > 0;
+    const { error } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
+    return true;
   }
 }
 

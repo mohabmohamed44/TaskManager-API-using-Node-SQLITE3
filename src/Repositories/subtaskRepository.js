@@ -1,52 +1,94 @@
-const database = require("../config/database");
+const supabase = require("../config/database");
 
 class SubtaskRepository {
   async create(subtask) {
     const { taskId, text, position } = subtask;
-    const result = await database.run(
-      "INSERT INTO subtasks (taskId, text, position) VALUES (?, ?, ?)",
-      [taskId, text, position || 0]
-    );
-    return this.getById(result.lastID);
+    const { data, error } = await supabase
+      .from("subtasks")
+      .insert([{ task_id: taskId, text, position: position || 0 }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   }
 
   async getById(id) {
-    return await database.get(
-      "SELECT * FROM subtasks WHERE id = ?",
-      [id]
-    );
+    const { data, error } = await supabase
+      .from("subtasks")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error && error.code !== "PGRST116") throw error;
+    return data;
   }
 
   async getByTaskId(taskId) {
-    return await database.all(
-      "SELECT * FROM subtasks WHERE taskId = ? ORDER BY position ASC",
-      [taskId]
-    );
+    const { data, error } = await supabase
+      .from("subtasks")
+      .select("*")
+      .eq("task_id", taskId)
+      .order("position", { ascending: true });
+
+    if (error) throw error;
+    return data;
   }
 
   async update(id, subtask) {
     const { text, completed, position } = subtask;
-    await database.run(
-      "UPDATE subtasks SET text = ?, completed = ?, position = ? WHERE id = ?",
-      [text, completed ? 1 : 0, position, id]
-    );
-    return this.getById(id);
+    const { data, error } = await supabase
+      .from("subtasks")
+      .update({ text, completed, position })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   }
 
   async delete(id) {
-    const result = await database.run(
-      "DELETE FROM subtasks WHERE id = ?",
-      [id]
-    );
-    return result.changes > 0;
+    const { error } = await supabase
+      .from("subtasks")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
+    return true;
   }
 
   async toggleComplete(id) {
-    await database.run(
-      "UPDATE subtasks SET completed = NOT completed WHERE id = ?",
-      [id]
-    );
-    return this.getById(id);
+    // Get current state
+    const { data: current } = await supabase
+      .from("subtasks")
+      .select("completed")
+      .eq("id", id)
+      .single();
+
+    // Toggle it
+    const { data, error } = await supabase
+      .from("subtasks")
+      .update({ completed: !current.completed })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async findByText(taskId, text) {
+    const trimmedText = text.trim();
+    const {data, error} = await supabase 
+      .from("subtasks")
+      .select("*")
+      .eq("task_id", taskId)
+      .ilike("text", trimmedText)
+      .maybeSingle();
+
+      if (error) throw error
+      return data;
   }
 }
 

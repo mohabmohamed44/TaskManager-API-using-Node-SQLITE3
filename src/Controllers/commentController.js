@@ -4,6 +4,9 @@ class CommentController {
   async createComment(req, res, next) {
     try {
       const { text } = req.body;
+      if (!text || typeof text !== "string" || !text.trim()) {
+        return res.status(400).json({ error: "Comment text is required" });
+      }
       const comment = await commentService.createComment(
         req.params.id,
         req.user.id,
@@ -17,6 +20,9 @@ class CommentController {
 
   async getComments(req, res, next) {
     try {
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
       const comments = await commentService.getComments(
         req.params.id,
         req.user.id,
@@ -29,6 +35,9 @@ class CommentController {
 
   async updateComment(req, res, next) {
     try {
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
       const { text } = req.body;
       const comment = await commentService.updateComment(
         req.params.commentId,
@@ -43,6 +52,9 @@ class CommentController {
 
   async deleteComment(req, res, next) {
     try {
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
       const result = await commentService.deleteComment(
         req.params.commentId,
         req.user.id,
