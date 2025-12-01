@@ -2,78 +2,141 @@ const supabase = require("../config/database");
 
 class TemplateRepository {
   async create(template) {
-    const { userId, name, title, description, priority, category } = template;
+    try {
+      const { userId, name, title, description, priority, category } = template;
 
-    const { data, error } = await supabase
-      .from("templates")
-      .insert([
-        {
-          user_id: userId,
-          name,
-          title,
-          description: description || "",
-          priority: priority || "medium",
-          category: category || "general",
-        },
-      ])
-      .select()
-      .single();
+      console.log("[REPO CREATE] Creating template:", {
+        userId,
+        name,
+        title,
+        priority: priority || "medium",
+        category: category || "general"
+      });
 
-    if (error) throw new Error(error.message);
-    return data;
+      const { data, error } = await supabase
+        .from("templates")
+        .insert([
+          {
+            user_id: userId,
+            name,
+            title,
+            description: description || "",
+            priority: priority || "medium",
+            category: category || "general",
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("[REPO CREATE] Supabase error:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      console.log("[REPO CREATE] Success:", data.id);
+      return data;
+    } catch (error) {
+      console.error("[REPO CREATE] Exception:", error);
+      throw error;
+    }
   }
 
   async getById(id) {
-    const { data, error } = await supabase
-      .from("templates")
-      .select("*")
-      .eq("id", id)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("templates")
+        .select("*")
+        .eq("id", id)
+        .single();
 
-    if (error) return null;
-    return data;
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Not found
+          return null;
+        }
+        console.error("[REPO GET BY ID] Supabase error:", error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error("[REPO GET BY ID] Exception:", error);
+      throw error;
+    }
   }
 
   async getByUserId(userId) {
-    const { data, error } = await supabase
-      .from("templates")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("templates")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
 
-    if (error) throw new Error(error.message);
-    return data;
+      if (error) {
+        console.error("[REPO GET BY USER ID] Supabase error:", error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error("[REPO GET BY USER ID] Exception:", error);
+      throw error;
+    }
   }
 
   async update(id, template) {
-    const { name, title, description, priority, category } = template;
+    try {
+      const { name, title, description, priority, category } = template;
 
-    const { data, error } = await supabase
-      .from("templates")
-      .update({
-        name,
-        title,
-        description,
-        priority,
-        category,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .select()
-      .single();
+      const { data, error } = await supabase
+        .from("templates")
+        .update({
+          name,
+          title,
+          description,
+          priority,
+          category,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select()
+        .single();
 
-    if (error) throw new Error(error.message);
-    return data;
+      if (error) {
+        console.error("[REPO UPDATE] Supabase error:", error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error("[REPO UPDATE] Exception:", error);
+      throw error;
+    }
   }
 
   async delete(id) {
-    const { data, error } = await supabase
-      .from("templates")
-      .delete()
-      .eq("id", id);
+    try {
+      const { error } = await supabase
+        .from("templates")
+        .delete()
+        .eq("id", id);
 
-    if (error) throw new Error(error.message);
-    return data.length > 0;
+      if (error) {
+        console.error("[REPO DELETE] Supabase error:", error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error("[REPO DELETE] Exception:", error);
+      throw error;
+    }
   }
 }
 
