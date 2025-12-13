@@ -1,14 +1,15 @@
-const rateLimit = require("express-rate-limit");
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 
-// Custom key generator to handle proxies that include port numbers in X-Forwarded-For
-// This prevents rate limit bypass when source port changes
+// Custom key generator using ipKeyGenerator helper to properly handle IPv6 addresses
+// This prevents rate limit bypass for both IPv4 and IPv6 users
 const keyGenerator = (request, _response) => {
   if (!request.ip) {
     console.error('Warning: request.ip is missing!');
     return request.socket.remoteAddress || 'unknown';
   }
-  // Strip port number from IP address (e.g., "192.168.1.1:12345" -> "192.168.1.1")
-  return request.ip.replace(/:\d+[^:]*$/, '');
+  // Use ipKeyGenerator to properly handle IPv6 subnet masking
+  // This also strips port numbers from IP addresses
+  return ipKeyGenerator(request.ip);
 };
 
 const generalLimiter = rateLimit({
