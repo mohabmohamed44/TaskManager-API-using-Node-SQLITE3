@@ -19,6 +19,10 @@ const { generalLimiter } = require("./Middleware/rateLimiter");
 
 const app = express();
 
+// Trust proxy - Required when behind reverse proxies (Koyeb, Heroku, etc.)
+// This allows Express to trust X-Forwarded-* headers for correct IP detection
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 
