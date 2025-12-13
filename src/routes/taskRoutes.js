@@ -3,6 +3,7 @@ const router = express.Router();
 const taskController = require("../Controllers/taskController");
 const { authenticate } = require("../Middleware/auth");
 const { taskValidation } = require("../Middleware/validation");
+const { createLimiter } = require("../Middleware/rateLimiter");
 
 // All routes require authentication
 router.use(authenticate);
@@ -34,6 +35,7 @@ router.get("/", taskValidation.query, taskController.getAllTasks);
 router.get("/:id", taskValidation.get, taskController.getTaskById);
 router.post(
   "/",
+  createLimiter,
   taskValidation.create,
   taskController.createTask,
 );
