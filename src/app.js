@@ -15,7 +15,6 @@ const sharingRoutes = require("./routes/sharingRoutes");
 const historyRoutes = require("./routes/historyRoutes");
 
 const { errorHandler, notFound } = require("./Middleware/errorHandler");
-const { generalLimiter } = require("./Middleware/rateLimiter");
 
 const app = express();
 
@@ -58,9 +57,6 @@ app.use(express.urlencoded({ extended: true }));
 
 // Compression middleware
 app.use(compression());
-
-// Rate limiting
-app.use(generalLimiter);
 
 // Health check endpoint
 app.get("/health", (req, res) => {
