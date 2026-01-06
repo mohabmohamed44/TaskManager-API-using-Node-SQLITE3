@@ -8,6 +8,19 @@ class SubtaskService {
       throw { status: 404, message: "Task not found" };
     }
 
+    // Validate text is Provided and not empty
+    if(!subtaskData.text || subtaskData.text.trim() === "") {
+      throw { status: 400, message: "Subtask text is required"};
+    }
+
+    const existingSubtask = await subtaskRepository.findByText(taskId, subtaskData.text);
+    if(existingSubtask) {
+      throw {
+        status: 409,
+        message: `A subtask with the text "${subtaskData.text}" already exists for this task`
+      }
+    }
+
     return await subtaskRepository.create({
       taskId,
       ...subtaskData,

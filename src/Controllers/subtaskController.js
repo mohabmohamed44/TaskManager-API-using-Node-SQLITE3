@@ -1,31 +1,18 @@
-const TaskRepository = require("../Repositories/TaskRepository");
-const subtaskRepository = require("../Repositories/subtaskRepository");
-const supabase = require("../config/database");
+
 const subtaskService = require("../services/subtaskService");
 
 class SubtaskController {
-  async createSubtask(taskId, userId, subtaskData) {
-    if (!task) {
-      throw { status: 404, message: "Task not found"};
+  async createSubtask(req, res, next) {
+    try {
+      const subtask = await subtaskService.createSubtask(
+        req.params.id,
+        req.user.id,
+        req.body
+      );
+      res.status(201).json(subtask);
+    } catch (error) {
+      next(error);
     }
-
-    // Validate text is Provided and not empty
-    if(!subtaskData.text || subtaskData.text.trim() === "") {
-      throw { status: 400, message: "Subtask text is required"};
-    }
-
-    const existingSubtask = await subtaskRepository.findByText(taskId, subtaskData.text);
-    if(existingSubtask) {
-      throw {
-        status: 409,
-        message: `A subtask with the text "${subtaskData.text}" already exists for this task`
-      }
-    }
-
-    return await subtaskRepository.create({
-      taskId,
-      ...subtaskData,
-    })
   }
 
 
