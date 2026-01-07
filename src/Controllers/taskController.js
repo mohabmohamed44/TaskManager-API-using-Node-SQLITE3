@@ -3,7 +3,7 @@ const taskService = require("../services/taskService");
 class TaskController {
   async getAllTasks(req, res, next) {
     try {
-      const tasks = await taskService.getAllTasks(req.user.id);
+      const tasks = await taskService.getAllTasks(req.user.id, req.query);
       res.json(tasks);
     } catch (error) {
       next(error);
