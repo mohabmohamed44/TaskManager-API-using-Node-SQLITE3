@@ -129,6 +129,15 @@ class TaskRepository {
       query = query.eq("category", filters.category);
     }
 
+    if (filters.search && typeof filters.search === 'string' && filters.search.trim()) {
+      const searchTerm = filters.search.trim();
+      query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+    }
+
+    if (filters.dueDate) {
+      query = query.eq("due_date", filters.dueDate);
+    }
+
     const { count, error } = await query;
 
     if (error) throw error;

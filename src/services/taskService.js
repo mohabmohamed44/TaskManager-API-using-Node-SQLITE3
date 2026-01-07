@@ -11,13 +11,13 @@ class TaskService {
       const totalPages = Math.ceil(total / filters.limit);
       
       return {
-        tasks,
-        pagination: {
-          currentPage: parseInt(filters.page) || 1,
+        meta: {
+          page: parseInt(filters.page) || 1,
+          limit: parseInt(filters.limit),
+          total,
           totalPages,
-          totalItems: total,
-          itemsPerPage: parseInt(filters.limit),
         },
+        tasks,
       };
     }
     
