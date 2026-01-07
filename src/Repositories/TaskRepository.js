@@ -86,9 +86,18 @@ class TaskRepository {
       query = query.eq("due_date", filters.dueDate);
     }
 
-    const sort = filters.sort || "created_at";
+    const sortMapping = {
+      createdAt: "created_at",
+      updatedAt: "updated_at",
+      dueDate: "due_date",
+      title: "title",
+      priority: "priority"
+    };
+
+    const sortParam = filters.sort || "createdAt";
+    const sortColumn = sortMapping[sortParam] || "created_at";
     const order = filters.order || "desc";
-    query = query.order(sort, { ascending: order === "asc" });
+    query = query.order(sortColumn, { ascending: order === "asc" });
 
     if (filters.limit) {
       const offset = filters.page ? (filters.page - 1) * filters.limit : 0;
