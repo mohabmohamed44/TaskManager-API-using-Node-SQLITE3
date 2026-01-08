@@ -59,6 +59,34 @@ class TaskRepository {
   }
 
   async getAll(userId, filters = {}) {
+    // 1. Get Total Count with Filters
+    let countQuery = supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("is_deleted", false);
+
+    if (filters.completed !== undefined) {
+      countQuery = countQuery.eq("completed", filters.completed);
+    }
+    if (filters.priority) {
+      countQuery = countQuery.eq("priority", filters.priority);
+    }
+    if (filters.category) {
+      countQuery = countQuery.eq("category", filters.category);
+    }
+    if (filters.search && typeof filters.search === 'string' && filters.search.trim()) {
+      const searchTerm = filters.search.trim();
+      countQuery = countQuery.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+    }
+    if (filters.dueDate) {
+      countQuery = countQuery.eq("due_date", filters.dueDate);
+    }
+
+    const { count, error: countError } = await countQuery;
+    if (countError) throw countError;
+
+    // 2. Get Paginated Data
     let query = supabase
       .from("tasks")
       .select("*")
@@ -68,20 +96,16 @@ class TaskRepository {
     if (filters.completed !== undefined) {
       query = query.eq("completed", filters.completed);
     }
-
     if (filters.priority) {
       query = query.eq("priority", filters.priority);
     }
-
     if (filters.category) {
       query = query.eq("category", filters.category);
     }
-
     if (filters.search && typeof filters.search === 'string' && filters.search.trim()) {
       const searchTerm = filters.search.trim();
       query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
     }
-
     if (filters.dueDate) {
       query = query.eq("due_date", filters.dueDate);
     }
@@ -99,15 +123,30 @@ class TaskRepository {
     const order = filters.order || "desc";
     query = query.order(sortColumn, { ascending: order === "asc" });
 
+    const limit = parseInt(filters.limit) || 10;
+    const page = parseInt(filters.page) || 1;
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
     if (filters.limit) {
-      const offset = filters.page ? (filters.page - 1) * filters.limit : 0;
-      query = query.range(offset, offset + filters.limit - 1);
+      query = query.range(from, to);
     }
 
-    const { data, error } = await query;
+    const { data: tasks, error } = await query;
 
     if (error) throw error;
-    return data;
+
+    const totalPages = Math.ceil(count / limit);
+
+    return {
+      meta: {
+        page,
+        limit,
+        total: count,
+        totalPages,
+      },
+      tasks,
+    };
   }
 
   async count(userId, filters = {}) {

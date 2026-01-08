@@ -4,24 +4,7 @@ const tagRepository = require("../Repositories/tagRepository");
 
 class TaskService {
   async getAllTasks(userId, filters= {}) {
-    const tasks = await taskRepository.getAll(userId, filters);
-    
-    if (filters.limit) {
-      const total = await taskRepository.count(userId, filters);
-      const totalPages = Math.ceil(total / filters.limit);
-      
-      return {
-        meta: {
-          page: parseInt(filters.page) || 1,
-          limit: parseInt(filters.limit),
-          total,
-          totalPages,
-        },
-        tasks,
-      };
-    }
-    
-    return { tasks };
+    return await taskRepository.getAll(userId, filters);
   }
 
   async getTaskById(id, userId) {
