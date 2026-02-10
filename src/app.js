@@ -29,7 +29,7 @@ app.use(helmet());
 // CORS setup
 const allowedOrigins = process.env.CORS_ORIGIN 
   ? process.env.CORS_ORIGIN.split(',')
-  : ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "https://priotize.netlify.app/"];
+  : ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "https://priotize.netlify.app"];
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
