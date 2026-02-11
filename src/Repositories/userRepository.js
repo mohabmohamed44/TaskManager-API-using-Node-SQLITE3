@@ -17,7 +17,7 @@ class UserRepository {
   async getById(id) {
     const { data, error } = await supabase
       .from("users")
-      .select("id, email, name, role, created_at, updated_at")
+      .select("id, email, name, role, profile_image_url, created_at, updated_at")
       .eq("id", id)
       .single();
 
