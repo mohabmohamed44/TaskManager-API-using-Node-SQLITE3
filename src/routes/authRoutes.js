@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const authController = require("../Controllers/authController");
+const { uploadProfilePicture } = require("../Controllers/userController");
+const upload = require("../Middleware/upload");
 const { authenticate } = require("../Middleware/auth");
 const { authValidation } = require("../Middleware/validation");
 const { authLimiter } = require("../Middleware/rateLimiter");
@@ -9,6 +11,19 @@ const { authLimiter } = require("../Middleware/rateLimiter");
 router.post("/register", authLimiter, authValidation.register, authController.register);
 router.post("/login", authLimiter, authValidation.login, authController.login);
 router.post("/refresh-token", authController.refreshToken);
+
+// Profile picture upload with multer error handling
+router.put("/profile-picture", authenticate, (req, res, next) => {
+  upload.single("profilePicture")(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({
+        error: "File Upload Error",
+        message: err.message
+      });
+    }
+    next();
+  });
+}, uploadProfilePicture);
 
 // Protected routes
 router.post("/logout", authenticate, authController.logout);

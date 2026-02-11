@@ -1,29 +1,55 @@
 const multer = require("multer");
 const path = require("path");
 
-// Use memory storage for Supabase uploads (files will be in memory buffer)
+// Memory storage for Supabase
 const storage = multer.memoryStorage();
 
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|txt|xlsx|xls|csv/;
-  const extname = allowedTypes.test(
-    path.extname(file.originalname).toLowerCase(),
-  );
-  const mimetype = allowedTypes.test(file.mimetype);
+const allowedExtensions = [
+  ".jpeg",
+  ".jpg",
+  ".png",
+  ".gif",
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".txt",
+  ".xlsx",
+  ".xls",
+  ".csv",
+];
 
-  if (mimetype && extname) {
-    return cb(null, true);
+const allowedMimeTypes = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+];
+
+const fileFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  if (
+    allowedExtensions.includes(ext) &&
+    allowedMimeTypes.includes(file.mimetype)
+  ) {
+    cb(null, true);
   } else {
-    cb(new Error("Only images and documents are allowed"));
+    cb(new Error("File type not allowed"), false);
   }
 };
 
 const upload = multer({
-  storage: storage,
+  storage,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024, // 5MB default
+    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024,
   },
-  fileFilter: fileFilter,
+  fileFilter,
 });
 
 module.exports = upload;

@@ -68,6 +68,16 @@ class UserRepository {
     if (error) throw error;
     return true;
   }
+
+  // Update Profile Image
+  async uploadProfilePicture(userId, imageUrl) {
+    const { error } = await supabase
+      .from("users")
+      .update({profile_image_url: imageUrl})
+      .eq("id", userId);
+    
+    if (error) throw error;
+  }
 }
 
 module.exports = new UserRepository();
