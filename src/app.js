@@ -13,6 +13,8 @@ const attachmentRoutes = require("./routes/attachmentRoutes");
 const templateRoutes = require("./routes/templateRoutes");
 const sharingRoutes = require("./routes/sharingRoutes");
 const historyRoutes = require("./routes/historyRoutes");
+const weeklyGoalsRoutes = require("./routes/weeklyGoalsRoutes");
+const kanbanRoutes = require("./routes/kanbanRoutes");
 
 const { errorHandler, notFound } = require("./Middleware/errorHandler");
 const { generalLimiter } = require("./Middleware/rateLimiter");
@@ -80,6 +82,8 @@ app.use("/api/v1/tasks", attachmentRoutes);
 app.use("/api/v1/templates", templateRoutes);
 app.use("/api/v1/tasks", sharingRoutes);
 app.use("/api/v1/tasks", historyRoutes);
+app.use("/api/v1/weekly-goals", weeklyGoalsRoutes);
+app.use("/api/v1/kanban", kanbanRoutes);
 
 // 404 handler
 app.use(notFound);
