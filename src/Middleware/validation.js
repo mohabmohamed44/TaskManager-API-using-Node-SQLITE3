@@ -84,7 +84,7 @@ const weeklyGoalValidation = {
   ],
 
   update: [
-    param("id").isInt().withMessage("Invalid goal ID"),
+    param("id").isUUID().withMessage("Invalid goal ID"),
     body("title").optional().trim().notEmpty(),
     body("priority").optional().isIn(["low", "medium", "high", "urgent"]),
     body("status").optional().isIn(["not_started", "in_progress", "completed", "abandoned"]),
@@ -92,7 +92,7 @@ const weeklyGoalValidation = {
     validate,
   ],
 
-  get: [param("id").isInt().withMessage("Invalid goal ID"), validate],
+  get: [param("id").isUUID().withMessage("Invalid goal ID"), validate],
 };
 
 const kanbanValidation = {
@@ -102,20 +102,20 @@ const kanbanValidation = {
     validate,
   ],
   updateBoard: [
-    param("id").isInt().withMessage("Invalid board ID"),
+    param("id").isUUID().withMessage("Invalid board ID"),
     body("name").optional().trim().notEmpty(),
     validate,
   ],
   createColumn: [
-    param("boardId").isInt().withMessage("Invalid board ID"),
+    param("boardId").isUUID().withMessage("Invalid board ID"),
     body("name").notEmpty().withMessage("Column name is required").trim(),
     body("color").optional().isHexColor(),
     body("wip_limit").optional().isInt({ min: 0 }),
     validate,
   ],
   createCard: [
-    param("boardId").isInt().withMessage("Invalid board ID"),
-    body("column_id").isInt().withMessage("Invalid column ID"),
+    param("boardId").isUUID().withMessage("Invalid board ID"),
+    body("column_id").isUUID().withMessage("Invalid column ID"),
     body("title").notEmpty().withMessage("Card title is required").trim(),
     body("priority").optional().isIn(["low", "medium", "high", "urgent"]),
     validate,
