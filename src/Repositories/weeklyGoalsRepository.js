@@ -157,17 +157,20 @@ class WeeklyGoalsRepository {
 
   async reorderGoals(userId, weekStart, goalId, newPosition) {
     try {
-      const { error } = await supabase.rpc("reorder_weekly_goals", {
-        p_user_id: userId,
-        p_week_start: weekStart,
-        p_goal_id: goalId,
-        p_new_position: newPosition
-      });
+      const { data, error } = await supabase
+        .from("weekly_goals")
+        .update({ position: newPosition })
+        .eq("id", goalId)
+        .eq("user_id", userId)
+        .eq("week_start", weekStart)
+        .select()
+        .single();
 
       if (error) throw new DatabaseError("Failed to reorder weekly goals", error);
-      return true;
+      if (!data) throw new NotFoundError("Weekly goal not found");
+      return data;
     } catch (error) {
-      if (error instanceof DatabaseError) throw error;
+      if (error instanceof NotFoundError || error instanceof DatabaseError) throw error;
       throw new DatabaseError("Unexpected error reordering weekly goals", error);
     }
   }
