@@ -187,16 +187,74 @@ class KanbanRepository {
 
   async reorderColumns(boardId, columnId, newPosition) {
     try {
-      const { error } = await supabase.rpc("reorder_kanban_columns", {
-        p_board_id: boardId,
-        p_column_id: columnId,
-        p_new_position: newPosition
-      });
+      // Get the current column to find its old position
+      const { data: current, error: fetchError } = await supabase
+        .from("kanban_columns")
+        .select("position")
+        .eq("id", columnId)
+        .eq("board_id", boardId)
+        .single();
+
+      if (fetchError || !current) throw new NotFoundError("Column not found");
+
+      const oldPosition = current.position;
+
+      if (oldPosition === newPosition) return current;
+
+      // Shift other columns to make room
+      if (newPosition < oldPosition) {
+        // Moving up: shift columns between [newPosition, oldPosition-1] down by 1
+        const { data: toShift } = await supabase
+          .from("kanban_columns")
+          .select("id, position")
+          .eq("board_id", boardId)
+          .neq("id", columnId)
+          .gte("position", newPosition)
+          .lt("position", oldPosition)
+          .order("position", { ascending: false });
+
+        if (toShift) {
+          for (const col of toShift) {
+            await supabase
+              .from("kanban_columns")
+              .update({ position: col.position + 1 })
+              .eq("id", col.id);
+          }
+        }
+      } else {
+        // Moving down: shift columns between [oldPosition+1, newPosition] up by 1
+        const { data: toShift } = await supabase
+          .from("kanban_columns")
+          .select("id, position")
+          .eq("board_id", boardId)
+          .neq("id", columnId)
+          .gt("position", oldPosition)
+          .lte("position", newPosition)
+          .order("position", { ascending: true });
+
+        if (toShift) {
+          for (const col of toShift) {
+            await supabase
+              .from("kanban_columns")
+              .update({ position: col.position - 1 })
+              .eq("id", col.id);
+          }
+        }
+      }
+
+      // Set the target column to the new position
+      const { data, error } = await supabase
+        .from("kanban_columns")
+        .update({ position: newPosition })
+        .eq("id", columnId)
+        .eq("board_id", boardId)
+        .select()
+        .single();
 
       if (error) throw new DatabaseError("Failed to reorder columns", error);
-      return true;
+      return data;
     } catch (error) {
-      if (error instanceof DatabaseError) throw error;
+      if (error instanceof NotFoundError || error instanceof DatabaseError) throw error;
       throw new DatabaseError("Unexpected error reordering columns", error);
     }
   }
@@ -279,32 +337,111 @@ class KanbanRepository {
 
   async moveCard(cardId, newColumnId, newPosition) {
     try {
-      const { error } = await supabase.rpc("move_kanban_card", {
-        p_card_id: cardId,
-        p_new_column_id: newColumnId,
-        p_new_position: newPosition
-      });
+      // Shift cards in the target column to make room
+      const { data: targetCards } = await supabase
+        .from("kanban_cards")
+        .select("id, position")
+        .eq("column_id", newColumnId)
+        .gte("position", newPosition)
+        .order("position", { ascending: false });
+
+      if (targetCards && targetCards.length > 0) {
+        for (const card of targetCards) {
+          await supabase
+            .from("kanban_cards")
+            .update({ position: card.position + 1 })
+            .eq("id", card.id);
+        }
+      }
+
+      // Move the card
+      const { data, error } = await supabase
+        .from("kanban_cards")
+        .update({
+          column_id: newColumnId,
+          position: newPosition
+        })
+        .eq("id", cardId)
+        .select()
+        .single();
 
       if (error) throw new DatabaseError("Failed to move card", error);
-      return true;
+      if (!data) throw new NotFoundError("Card not found");
+      return data;
     } catch (error) {
-      if (error instanceof DatabaseError) throw error;
+      if (error instanceof NotFoundError || error instanceof DatabaseError) throw error;
       throw new DatabaseError("Unexpected error moving card", error);
     }
   }
 
   async reorderCards(columnId, cardId, newPosition) {
     try {
-      const { error } = await supabase.rpc("reorder_kanban_cards", {
-        p_column_id: columnId,
-        p_card_id: cardId,
-        p_new_position: newPosition
-      });
+      // Get current card info (use card ID only to find actual column)
+      const { data: current, error: fetchError } = await supabase
+        .from("kanban_cards")
+        .select("position, column_id")
+        .eq("id", cardId)
+        .single();
+
+      if (fetchError || !current) throw new NotFoundError("Card not found");
+
+      // Use the card's actual column_id
+      const actualColumnId = current.column_id;
+      const oldPosition = current.position;
+
+      if (oldPosition === newPosition) return current;
+
+      // Shift cards between old and new positions
+      if (newPosition < oldPosition) {
+        const { data: toShift } = await supabase
+          .from("kanban_cards")
+          .select("id, position")
+          .eq("column_id", actualColumnId)
+          .neq("id", cardId)
+          .gte("position", newPosition)
+          .lt("position", oldPosition)
+          .order("position", { ascending: false });
+
+        if (toShift) {
+          for (const card of toShift) {
+            await supabase
+              .from("kanban_cards")
+              .update({ position: card.position + 1 })
+              .eq("id", card.id);
+          }
+        }
+      } else {
+        const { data: toShift } = await supabase
+          .from("kanban_cards")
+          .select("id, position")
+          .eq("column_id", actualColumnId)
+          .neq("id", cardId)
+          .gt("position", oldPosition)
+          .lte("position", newPosition)
+          .order("position", { ascending: true });
+
+        if (toShift) {
+          for (const card of toShift) {
+            await supabase
+              .from("kanban_cards")
+              .update({ position: card.position - 1 })
+              .eq("id", card.id);
+          }
+        }
+      }
+
+      // Set target card to new position
+      const { data, error } = await supabase
+        .from("kanban_cards")
+        .update({ position: newPosition })
+        .eq("id", cardId)
+        .select()
+        .single();
 
       if (error) throw new DatabaseError("Failed to reorder cards", error);
-      return true;
+      return data;
     } catch (error) {
-      if (error instanceof DatabaseError) throw error;
+      if (error instanceof NotFoundError || error instanceof DatabaseError) throw error;
       throw new DatabaseError("Unexpected error reordering cards", error);
     }
   }
