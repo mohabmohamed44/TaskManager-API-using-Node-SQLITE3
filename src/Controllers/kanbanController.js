@@ -169,12 +169,13 @@ class KanbanController {
 
   async moveCard(req, res, next) {
     try {
-      const { newColumnId, newPosition } = req.body;
+      const { newColumnId, columnId, newPosition } = req.body;
+      const targetColumnId = columnId || newColumnId;
       await kanbanService.moveCard(
         req.params.id,
         req.user.id,
         req.params.boardId,
-        newColumnId,
+        targetColumnId,
         newPosition
       );
       res.json({ success: true });
