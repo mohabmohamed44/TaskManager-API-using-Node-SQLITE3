@@ -29,14 +29,14 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 // CORS setup
-const allowedOrigins = process.env.CORS_ORIGIN 
+const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',')
-  : ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "https://priotize.netlify.app"];
+  : ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "https://prioritiz.netlify.app"];
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
