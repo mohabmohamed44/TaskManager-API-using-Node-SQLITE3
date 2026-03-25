@@ -30,8 +30,9 @@ app.use(helmet());
 
 // CORS setup
 const allowedOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',')
-  : ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "https://prioritiz.netlify.app"];
+  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+  : ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "http://localhost:8000", "https://prioritiz.netlify.app"];
+
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -40,6 +41,10 @@ const corsOptions = {
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(`⚠️ CORS blocked origin: ${origin}`);
+        console.info(`✅ Allowed origins: ${allowedOrigins.join(", ")}`);
+      }
       callback(new Error('Not allowed by CORS'));
     }
   },

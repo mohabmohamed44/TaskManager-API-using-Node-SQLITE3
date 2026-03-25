@@ -44,7 +44,10 @@ class WeeklyGoalsService {
     }
 
     // Validate it's actually a week (7 days)
-    const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    // Use UTC to avoid DST issues when computing day differences
+    const startUTC = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+    const endUTC = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+    const daysDiff = Math.round((endUTC - startUTC) / (1000 * 60 * 60 * 24));
     if (daysDiff !== 6) {
       throw new ValidationError("Week must be exactly 7 days (start to end)");
     }
