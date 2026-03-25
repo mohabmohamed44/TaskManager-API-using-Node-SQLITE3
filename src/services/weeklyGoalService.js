@@ -96,6 +96,7 @@ class WeeklyGoalsService {
     }
 
     if (updates.status) {
+      updates.status = updates.status.toLowerCase();
       const validStatuses = ["not_started", "in_progress", "completed", "abandoned"];
       if (!validStatuses.includes(updates.status)) {
         throw new ValidationError(`Status must be one of: ${validStatuses.join(", ")}`);
