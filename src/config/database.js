@@ -15,6 +15,7 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
+    flowType: "pkce",
   },
 });
 
