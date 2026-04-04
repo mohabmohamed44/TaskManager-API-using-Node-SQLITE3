@@ -1,6 +1,35 @@
 const jwtConfig = require("../config/jwt");
+const oauthConfig = require("../config/oauth");
 const userRepository = require("../Repositories/userRepository");
 const tokenBlacklistRepository = require("../Repositories/tokenBlackListRepository");
+
+const resolveAuthenticatedUser = async (token) => {
+  try {
+    const decoded = jwtConfig.verifyToken(token);
+
+    return {
+      type: "app",
+      decoded,
+    };
+  } catch (error) {
+    if (error.name !== "JsonWebTokenError") {
+      throw error;
+    }
+
+    const supabaseUser = await oauthConfig.getUserFromSession(token);
+
+    if (!supabaseUser?.email) {
+      const invalidError = new Error("Invalid token");
+      invalidError.name = "JsonWebTokenError";
+      throw invalidError;
+    }
+
+    return {
+      type: "supabase",
+      supabaseUser,
+    };
+  }
+};
 
 const authenticate = async (req, res, next) => {
   try {
@@ -30,26 +59,27 @@ const authenticate = async (req, res, next) => {
       });
     }
 
-    // First verify the token is valid
-    const decoded = jwtConfig.verifyToken(token);
+    const authResult = await resolveAuthenticatedUser(token);
 
-    // Then check if token is blacklisted (logged out)
-    const isBlacklisted = await tokenBlacklistRepository.isBlacklisted(token);
-    if (isBlacklisted) {
-      return res
-        .status(401)
-        .json({ error: "Token has been revoked. Please login again." });
+    if (authResult.type === "app") {
+      const isBlacklisted = await tokenBlacklistRepository.isBlacklisted(token);
+      if (isBlacklisted) {
+        return res
+          .status(401)
+          .json({ error: "Token has been revoked. Please login again." });
+      }
     }
 
-    const user = await userRepository.getById(decoded.userId);
+    const user = authResult.type === "app"
+      ? await userRepository.getById(authResult.decoded.userId)
+      : await userRepository.getByEmail(authResult.supabaseUser.email);
 
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
 
-    // Check for "logout from all devices"
-    if (user.tokens_valid_from) {
-      const tokenIssuedAt = new Date(decoded.iat * 1000);
+    if (authResult.type === "app" && user.tokens_valid_from) {
+      const tokenIssuedAt = new Date(authResult.decoded.iat * 1000);
       const tokensValidFrom = new Date(user.tokens_valid_from);
       if (tokenIssuedAt < tokensValidFrom) {
         return res

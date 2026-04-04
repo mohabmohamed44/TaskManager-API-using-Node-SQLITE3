@@ -2,11 +2,15 @@ const supabase = require("../config/database");
 
 class UserRepository {
   async create(user) {
-    const { email, password, name, role } = user;
+    const { email, password, name, role, profile_image_url, oauth_providers } = user;
+
+    const insertData = { email, password, name, role: role || "user" };
+    if (profile_image_url) insertData.profile_image_url = profile_image_url;
+    if (oauth_providers) insertData.oauth_providers = oauth_providers;
     
     const { data, error } = await supabase
       .from("users")
-      .insert([{ email, password, name, role: role || "user" }])
+      .insert([insertData])
       .select()
       .single();
 
@@ -46,13 +50,17 @@ class UserRepository {
   }
 
   async update(id, user) {
-    const { name, role } = user;
-    
+    // Build dynamic update object — only include fields that are provided
+    const updateData = {};
+    if (user.name !== undefined) updateData.name = user.name;
+    if (user.role !== undefined) updateData.role = user.role;
+    if (user.profile_image_url !== undefined) updateData.profile_image_url = user.profile_image_url;
+
     const { data, error } = await supabase
       .from("users")
-      .update({ name, role })
+      .update(updateData)
       .eq("id", id)
-      .select("id, email, name, role, created_at, updated_at")
+      .select("id, email, name, role, profile_image_url, oauth_providers, created_at, updated_at")
       .single();
 
     if (error) throw error;
