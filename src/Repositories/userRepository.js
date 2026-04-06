@@ -86,6 +86,59 @@ class UserRepository {
     
     if (error) throw error;
   }
+
+  async addOAuthProvider(id, provider) {
+    const user = await this.getById(id);
+    if (!user) return;
+
+    let providers = [];
+    if (typeof user.oauth_providers === "string") {
+      try {
+        providers = JSON.parse(user.oauth_providers);
+      } catch (e) {
+        providers = [];
+      }
+    } else if (Array.isArray(user.oauth_providers)) {
+      providers = user.oauth_providers;
+    }
+
+    if (!providers.includes(provider)) {
+      providers.push(provider);
+      
+      const { error } = await supabase
+        .from("users")
+        .update({ oauth_providers: JSON.stringify(providers) })
+        .eq("id", id);
+
+      if (error) throw error;
+    }
+  }
+
+  async getOAuthProviders(id) {
+    const { data, error } = await supabase
+      .from("users")
+      .select("oauth_providers")
+      .eq("id", id)
+      .single();
+
+    if (error && error.code !== "PGRST116") throw error;
+    
+    if (!data || !data.oauth_providers) return [];
+
+    if (typeof data.oauth_providers === "string") {
+      try {
+        return JSON.parse(data.oauth_providers);
+      } catch (e) {
+        return [];
+      }
+    }
+    
+    if (Array.isArray(data.oauth_providers)) {
+      return data.oauth_providers;
+    }
+    
+    return [];
+  }
 }
 
 module.exports = new UserRepository();
