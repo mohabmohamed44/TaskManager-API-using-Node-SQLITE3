@@ -59,6 +59,25 @@ class OAuthController {
   }
 
   /**
+   * POST /auth/oauth/sync
+   * Validate Supabase token from frontend and return backend JWT
+   */
+  async syncAccount(req, res, next) {
+    try {
+      const { access_token } = req.body || {};
+
+      if (!access_token) {
+        throw new ValidationError("access_token is required in request body");
+      }
+
+      const result = await oauthService.syncUserFromSupabase(access_token);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * POST /auth/oauth/link
    * Link OAuth provider to existing account
    * Returns an OAuth URL - user must be redirected to it

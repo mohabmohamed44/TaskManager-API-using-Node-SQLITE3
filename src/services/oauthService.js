@@ -121,6 +121,61 @@ class OAuthService {
   }
 
   /**
+   * Sync user from frontend Supabase Session
+   * @param {string} accessToken - Supabase access token from frontend
+   * @returns {Promise<object>} User data with backend JWT tokens
+   */
+  async syncUserFromSupabase(accessToken) {
+    if (!accessToken) {
+      throw new ValidationError("Access token is required");
+    }
+
+    try {
+      const supabaseUser = await oauthConfig.getUserFromSession(accessToken);
+      
+      if (!supabaseUser || !supabaseUser.email) {
+        throw new UnauthorizedError("Invalid Supabase token");
+      }
+
+      let user = await userRepository.getByEmail(supabaseUser.email);
+
+      if (!user) {
+        user = await this.createUserFromOAuth(supabaseUser);
+      } else {
+        user = await this.updateUserOAuthData(user.id, supabaseUser);
+      }
+
+      // Generate our own JWT tokens
+      const token = jwtConfig.generateToken({ 
+        userId: user.id, 
+        email: user.email 
+      });
+      
+      const refreshToken = jwtConfig.generateRefreshToken({ 
+        userId: user.id 
+      });
+
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          avatar: supabaseUser.user_metadata?.avatar_url || null,
+          provider: supabaseUser.app_metadata?.provider || "email",
+        },
+        token,
+        refreshToken
+      };
+    } catch (error) {
+      if (error instanceof ValidationError || error instanceof UnauthorizedError) {
+        throw error;
+      }
+      throw new UnauthorizedError(`Failed to sync user: ${error.message}`);
+    }
+  }
+
+  /**
    * Create new user from OAuth provider data
    * @param {object} supabaseUser - User data from Supabase
    * @returns {Promise<object>} Created user

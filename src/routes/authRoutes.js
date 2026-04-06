@@ -38,6 +38,9 @@ router.get("/oauth/providers", authenticate, oauthController.getLinkedProviders)
 // Step 2: Initiate OAuth (get redirect URL)
 router.get("/oauth/:provider", oauthController.initiateOAuth);
 
+// Step 3: Frontend OAuth Sync (takes Supabase token, returns Backend JWT)
+router.post("/oauth/sync", oauthController.syncAccount);
+
 // Link/Unlink OAuth providers (protected)
 router.post("/oauth/link", authenticate, oauthController.linkProvider);
 router.delete("/oauth/unlink/:provider", authenticate, oauthController.unlinkProvider);
