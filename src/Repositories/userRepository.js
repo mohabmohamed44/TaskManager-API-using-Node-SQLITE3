@@ -40,10 +40,16 @@ class UserRepository {
     return data;
   }
 
-  async getAll() {
-    const { data, error } = await supabase
+  async getAll(excludeUserId = null) {
+    let query = supabase
       .from("users")
       .select("id, email, name, role, profile_image_url, created_at, updated_at");
+
+    if (excludeUserId) {
+      query = query.neq("id", excludeUserId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     return data;

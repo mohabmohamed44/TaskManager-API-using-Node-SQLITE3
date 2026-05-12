@@ -32,7 +32,8 @@ const uploadProfilePicture = async (req, res, next) => {
 
 const getAllUsers = async (req, res, next) => {
     try {
-        const users = await userService.getAllUsers();
+        const userId = req.user?.id;
+        const users = await userService.getAllUsers(userId);
         res.json({ data: users });
     } catch (error) {
         next(error);

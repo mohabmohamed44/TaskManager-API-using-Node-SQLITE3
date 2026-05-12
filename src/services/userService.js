@@ -4,8 +4,8 @@ const { v4: uuid } = require("uuid");
 
 
 const userService = {
-    async getAllUsers() {
-        return await userRepository.getAll();
+    async getAllUsers(excludeUserId) {
+        return await userRepository.getAll(excludeUserId);
     },
 
     async uploadProfilePicture(userId, file) {
