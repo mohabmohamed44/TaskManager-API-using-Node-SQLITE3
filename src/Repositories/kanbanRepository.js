@@ -263,7 +263,8 @@ class KanbanRepository {
   
   async createCard(cardData) {
     try {
-      const { board_id, column_id, task_id, title, description, priority, labels, assigned_to, due_date } = cardData;
+      const { board_id, column_id, task_id, title, description, priority, labels, assigned_to, assigned_user_id, due_date } = cardData;
+      const assignee = assigned_to || assigned_user_id || null;
       
       // Get max position in column
       const { data: maxPos } = await supabase
@@ -286,7 +287,7 @@ class KanbanRepository {
           description,
           priority: priority || "medium",
           labels: labels || [],
-          assigned_to,
+          assigned_to: assignee,
           due_date,
           position
         }])
