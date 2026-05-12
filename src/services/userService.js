@@ -4,6 +4,10 @@ const { v4: uuid } = require("uuid");
 
 
 const userService = {
+    async getAllUsers() {
+        return await userRepository.getAll();
+    },
+
     async uploadProfilePicture(userId, file) {
         const fileName = `${userId}-${uuid()}.png`;
 

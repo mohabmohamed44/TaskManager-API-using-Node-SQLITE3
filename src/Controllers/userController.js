@@ -6,12 +6,6 @@ const uploadProfilePicture = async (req, res, next) => {
         const userId = req.user.id;
         const file = req.file;
 
-        // Debug logging
-        console.log("Content-Type:", req.headers['content-type']);
-        console.log("Request body:", req.body);
-        console.log("Request file:", req.file);
-        console.log("Request files:", req.files);
-
         if (!file) {
             return res.status(400).json({
                 error: "Bad Request",
@@ -36,4 +30,13 @@ const uploadProfilePicture = async (req, res, next) => {
     }
 }
 
-module.exports = { uploadProfilePicture };
+const getAllUsers = async (req, res, next) => {
+    try {
+        const users = await userService.getAllUsers();
+        res.json({ data: users });
+    } catch (error) {
+        next(error);
+    }
+}
+
+module.exports = { uploadProfilePicture, getAllUsers };

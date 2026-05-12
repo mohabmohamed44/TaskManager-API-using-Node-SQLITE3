@@ -43,7 +43,7 @@ class UserRepository {
   async getAll() {
     const { data, error } = await supabase
       .from("users")
-      .select("id, email, name, role, created_at");
+      .select("id, email, name, role, profile_image_url, created_at, updated_at");
 
     if (error) throw error;
     return data;
