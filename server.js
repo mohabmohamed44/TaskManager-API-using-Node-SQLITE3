@@ -3,6 +3,8 @@ const app = require("./src/app");
 const cronJobs = require("./src/config/cronJobs");
 const supabase = require("./src/config/database");
 
+// IISNode passes a dynamic port or a Named Pipe string on production.
+// Keeping fallback to 3000 for local development.
 const PORT = process.env.PORT || 3000;
 
 // Graceful shutdown handler
@@ -23,9 +25,15 @@ process.on("SIGINT", gracefulShutdown);
 
   // Start Express server
   app.listen(PORT, () => {
-    console.log(`🚀 Server listening on http://localhost:${PORT}`);
+    // Check if PORT is a standard number or a named pipe string from IIS
+    const isNamedPipe = typeof PORT === 'string' && PORT.isNaN;
+    
+    console.log(`🚀 Server listening on: ${isNamedPipe ? PORT : `http://localhost:${PORT}`}`);
     console.log(`📝 Environment: ${process.env.NODE_ENV || "development"}`);
-    console.log(`📊 API v1: http://localhost:${PORT}/api/v1`);
-    console.log(`💚 Health check: http://localhost:${PORT}/health`);
+    
+    if (!isNamedPipe) {
+      console.log(`📊 API v1: http://localhost:${PORT}/api/v1`);
+      console.log(`💚 Health check: http://localhost:${PORT}/health`);
+    }
   });
 })();
