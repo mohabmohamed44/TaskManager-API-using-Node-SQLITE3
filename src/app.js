@@ -32,7 +32,7 @@ app.use(helmet());
 // CORS setup
 const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
-  : ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "http://localhost:8000", "https://prioritiz.netlify.app"];
+  : ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "http://localhost:8000", "https://task-management-rho-smoky.vercel.app"];
 
 const corsOptions = {
   origin: function (origin, callback) {
