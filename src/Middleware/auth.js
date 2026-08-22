@@ -138,9 +138,9 @@ const authenticate = async (req, res, next) => {
       });
     }
 
-    return res.status(401).json({ 
-      error: "Authentication failed",
-      message: error.message || "Please check your token and try again."
+    return res.status(500).json({ 
+      error: "Internal Authentication Error",
+      message: error.message || "An internal error occurred during authentication."
     });
   }
 };
