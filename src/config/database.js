@@ -2,7 +2,7 @@ const { createClient } = require("@supabase/supabase-js");
 
 const supabaseUrl = process.env.SUPABASE_PROJECT_URL;
 const supabaseKey = process.env.SUPABASE_API_KEY;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_API_KEY || supabaseKey;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Storage bucket name - can be overridden via environment variable
 const STORAGE_BUCKET_NAME = process.env.SUPABASE_STORAGE_BUCKET || "Images";
@@ -11,16 +11,22 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error("Missing Supabase environment variables");
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey, {
+if (!supabaseServiceKey) {
+  console.warn("⚠️  SUPABASE_SERVICE_ROLE_KEY is not set! Database queries will be subject to RLS policies and may fail.");
+  console.warn("   Get it from: Supabase Dashboard → Settings → API → service_role key");
+}
+
+// Main database client — uses service role key to bypass RLS
+// The backend handles its own authentication via JWT, so RLS is not needed here
+const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
-    flowType: "pkce",
   },
 });
 
 // Create a separate client for storage operations using service role key (bypasses RLS)
-const supabaseStorage = createClient(supabaseUrl, supabaseServiceKey, {
+const supabaseStorage = createClient(supabaseUrl, supabaseServiceKey || supabaseKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
